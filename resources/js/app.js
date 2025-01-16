@@ -6,9 +6,10 @@
 
 import './bootstrap';
 import { createApp } from 'vue';
-import FullCalendar from '@fullcalendar/vue3';
+
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { vMaska } from 'maska/vue';
 /**
  * Next, we will create a fresh Vue application instance. You may then begin
  * registering components with the application instance so they are ready
@@ -16,7 +17,8 @@ import interactionPlugin from '@fullcalendar/interaction';
  */
 
 const app = createApp({});
-app.component('FullCalendar', FullCalendar);
+
+app.directive('maska', vMaska);
 /**
  * The following block of code may be used to automatically register your
  * Vue components. It will recursively scan this directory for the Vue

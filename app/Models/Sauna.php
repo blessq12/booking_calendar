@@ -8,6 +8,8 @@ use App\Models\Schedule;
 
 class Sauna extends Model
 {
+    protected $fillable = ['company_id', 'name', 'address', 'phone'];
+
     public function company()
     {
         return $this->belongsTo(Company::class);

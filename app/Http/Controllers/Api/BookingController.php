@@ -48,7 +48,7 @@ class BookingController extends Controller
             }
 
             // Проверяем, что продолжительность бронирования не менее 1 часа и не более 12 часов
-            $duration = $endDate->diffInHours($startDate);
+            $duration = $startDate->diffInHours($endDate, false);
             if ($duration < 1) {
                 throw new \Exception('Минимальное время бронирования - 1 час');
             }
@@ -64,10 +64,15 @@ class BookingController extends Controller
             }
 
             // Находим или создаем расписание на этот день
-            $schedule = Schedule::firstOrCreate([
-                'sauna_id' => $request->sauna_id,
-                'date' => $date,
-            ]);
+            $schedule = Schedule::firstOrCreate(
+                [
+                    'sauna_id' => $request->sauna_id,
+                    'date' => $date,
+                ],
+                [
+                    'slots' => []
+                ]
+            );
 
             // Получаем текущие слоты или создаем новые
             $slots = $schedule->slots ?? [];

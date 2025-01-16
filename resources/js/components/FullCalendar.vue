@@ -15,6 +15,7 @@
         </div>
 
         <FullCalendar 
+            ref="fullCalendar"
             :options="calendarOptions"
             class="calendar"
         />
@@ -26,37 +27,56 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Сауна</label>
-                        <select v-model="bookingForm.sauna_id" class="form-control">
+                        <select v-model="bookingForm.sauna_id" class="form-control" :class="{ 'error': validationErrors.sauna_id }">
                             <option v-for="sauna in saunas" :key="sauna.id" :value="sauna.id">
                                 {{ sauna.name }}
                             </option>
                         </select>
+                        <span class="error-message" v-if="validationErrors.sauna_id">{{ validationErrors.sauna_id[0] }}</span>
                     </div>
 
                     <div class="form-group">
                         <label>Имя клиента</label>
-                        <input type="text" v-model="bookingForm.client_name" class="form-control">
+                        <input type="text" v-model="bookingForm.client_name" class="form-control" :class="{ 'error': validationErrors.client_name }">
+                        <span class="error-message" v-if="validationErrors.client_name">{{ validationErrors.client_name[0] }}</span>
                     </div>
 
                     <div class="form-group">
                         <label>Телефон</label>
-                        <input type="tel" v-model="bookingForm.client_phone" class="form-control">
+                        <input type="tel" v-model="bookingForm.client_phone" v-maska data-maska="+7 (###) ###-##-##" class="form-control" :class="{ 'error': validationErrors.client_phone }">
+                        <span class="error-message" v-if="validationErrors.client_phone">{{ validationErrors.client_phone[0] }}</span>
                     </div>
 
                     <div class="form-group">
                         <label>Дата и время начала</label>
-                        <input type="datetime-local" v-model="bookingForm.start_datetime" class="form-control">
+                        <input 
+                            type="datetime-local" 
+                            v-model="bookingForm.start_datetime" 
+                            @change="handleStartDateChange"
+                            class="form-control" 
+                            :class="{ 'error': validationErrors.start }"
+                        >
+                        <span class="error-message" v-if="validationErrors.start">{{ validationErrors.start[0] }}</span>
                     </div>
 
                     <div class="form-group">
                         <label>Дата и время окончания</label>
-                        <input type="datetime-local" v-model="bookingForm.end_datetime" class="form-control">
+                        <input 
+                            type="datetime-local" 
+                            v-model="bookingForm.end_datetime" 
+                            @change="handleEndDateChange"
+                            class="form-control" 
+                            :class="{ 'error': validationErrors.end }"
+                        >
+                        <span class="error-message" v-if="validationErrors.end">{{ validationErrors.end[0] }}</span>
                     </div>
                 </div>
 
                 <div class="modal-footer">
-                    <button @click="closeModal" class="btn-cancel">Отмена</button>
-                    <button @click="createBooking" class="btn-submit">Создать запись</button>
+                    <button @click="closeModal" class="btn-cancel" :disabled="isLoading">Отмена</button>
+                    <button @click="createBooking" class="btn-submit" :disabled="isLoading">
+                        {{ isLoading ? 'Создание...' : 'Создать запись' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -64,7 +84,7 @@
 </template>
 
 <script>
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -76,11 +96,17 @@ export default defineComponent({
     components: {
         FullCalendar
     },
+    setup() {
+        const fullCalendar = ref(null)
+        return { fullCalendar }
+    },
     data() {
         return {
             saunas: [],
             selectedSauna: '',
             showModal: false,
+            isLoading: false,
+            validationErrors: {},
             bookingForm: {
                 sauna_id: '',
                 client_name: '',
@@ -94,7 +120,7 @@ export default defineComponent({
                     timeGridPlugin,
                     interactionPlugin
                 ],
-                initialView: this.getInitialView(),
+                initialView: 'timeGridWeek',
                 locale: ruLocale,
                 headerToolbar: {
                     left: 'prev,next today',
@@ -108,14 +134,13 @@ export default defineComponent({
                 selectMirror: true,
                 dayMaxEvents: true,
                 weekends: true,
-                events: [],
                 eventClick: this.handleEventClick,
-                eventsSet: this.handleEvents,
                 editable: false,
                 height: 'auto',
                 expandRows: true,
                 stickyHeaderDates: true,
                 nowIndicator: true,
+                allDaySlot: false,
                 views: {
                     timeGridWeek: {
                         titleFormat: { year: 'numeric', month: 'long', day: 'numeric' }
@@ -155,9 +180,9 @@ export default defineComponent({
         handleEventClick(clickInfo) {
             // Показываем информацию о существующей записи
             alert(`
-                Запись на: ${this.formatDateTime(clickInfo.event.start)}
+                Бронирование
+                Время: ${this.formatDateTime(clickInfo.event.start)}
                 До: ${this.formatDateTime(clickInfo.event.end)}
-                Статус: ${clickInfo.event.extendedProps.status}
             `)
         },
         handleEvents(events) {
@@ -177,19 +202,48 @@ export default defineComponent({
             try {
                 const response = await fetch(`/api/schedules?sauna_id=${this.selectedSauna}`)
                 const data = await response.json()
-                
+                console.log('Received data:', data)
+
                 const events = data.map(schedule => {
-                    return schedule.slots.map(slot => ({
-                        id: `${schedule.id}-${slot.time}`,
-                        title: slot.status === 'available' ? 'Свободно' : 'Занято',
-                        start: `${schedule.date}T${slot.time}`,
-                        end: slot.booking_end ? `${schedule.date}T${slot.booking_end}` : this.calculateEndTime(`${schedule.date}T${slot.time}`),
-                        status: slot.status,
-                        backgroundColor: slot.status === 'available' ? '#4CAF50' : '#F44336'
-                    }))
+                    const slots = Array.isArray(schedule.slots) ? schedule.slots : []
+                    console.log('Schedule slots:', slots)
+
+                    const bookedSlots = slots.filter(slot => slot && slot.status === 'booked')
+                    console.log('Booked slots:', bookedSlots)
+
+                    return bookedSlots.map(slot => {
+                        const date = schedule.date
+                        const startTime = slot.time || '00:00:00'
+                        const endTime = slot.booking_end || this.calculateEndTime(`${date}T${startTime}`).split('T')[1]
+                        
+                        const eventStart = `${date}T${startTime}`
+                        const eventEnd = `${date}T${endTime}`
+
+                        console.log('Event times:', { eventStart, eventEnd })
+
+                        return {
+                            id: `${schedule.id}-${slot.time}`,
+                            title: 'Забронировано',
+                            start: eventStart,
+                            end: eventEnd,
+                            backgroundColor: '#F44336',
+                            borderColor: '#D32F2F',
+                            extendedProps: {
+                                client_id: slot.client_id
+                            }
+                        }
+                    })
                 }).flat()
 
-                this.calendarOptions.events = events
+                console.log('Generated events:', events)
+
+                if (this.$refs.fullCalendar) {
+                    const calendarApi = this.$refs.fullCalendar.getApi()
+                    calendarApi.removeAllEvents()
+                    events.forEach(event => {
+                        calendarApi.addEvent(event)
+                    })
+                }
             } catch (error) {
                 console.error('Error loading events:', error)
             }
@@ -210,11 +264,16 @@ export default defineComponent({
             })
         },
         async createBooking() {
+            this.isLoading = true;
+            this.validationErrors = {};
+
             try {
                 const response = await fetch('/api/bookings', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
                     body: JSON.stringify({
                         sauna_id: this.bookingForm.sauna_id,
@@ -223,39 +282,88 @@ export default defineComponent({
                         start: this.bookingForm.start_datetime,
                         end: this.bookingForm.end_datetime
                     })
-                })
+                });
 
-                if (response.ok) {
-                    this.closeModal()
-                    this.loadEvents()
-                    alert('Запись успешно создана!')
-                } else {
-                    const error = await response.json()
-                    alert(error.message || 'Ошибка при создании записи')
+                const data = await response.json();
+
+                if (response.status === 422) {
+                    this.validationErrors = data.errors || {};
+                    throw new Error(data.message || 'Ошибка валидации');
                 }
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Ошибка при создании записи');
+                }
+
+                // Закрываем модальное окно
+                this.closeModal();
+                
+                // Обновляем календарь
+                await this.loadEvents();
+                
+                // Показываем сообщение об успехе
+                alert('Запись успешно создана!');
             } catch (error) {
-                console.error('Error creating booking:', error)
-                alert('Ошибка при создании записи')
+                console.error('Error creating booking:', error);
+                if (!Object.keys(this.validationErrors).length) {
+                    alert(error.message || 'Ошибка при создании записи');
+                }
+            } finally {
+                this.isLoading = false;
             }
         },
         closeModal() {
-            this.showModal = false
+            this.showModal = false;
+            this.validationErrors = {};
             this.bookingForm = {
                 sauna_id: this.selectedSauna,
                 client_name: '',
                 client_phone: '',
                 start_datetime: '',
                 end_datetime: ''
+            };
+        },
+        handleStartDateChange() {
+            const start = new Date(this.bookingForm.start_datetime)
+            const end = new Date(this.bookingForm.end_datetime)
+            
+            // Если конечная дата раньше начальной или разница меньше часа
+            if (end <= start || (end - start) < 3600000) { // 3600000 мс = 1 час
+                const newEnd = new Date(start)
+                newEnd.setHours(newEnd.getHours() + 1)
+                this.bookingForm.end_datetime = newEnd.toISOString().slice(0, 16)
+            }
+        },
+        handleEndDateChange() {
+            const start = new Date(this.bookingForm.start_datetime)
+            const end = new Date(this.bookingForm.end_datetime)
+            
+            // Если конечная дата раньше начальной или разница меньше часа
+            if (end <= start || (end - start) < 3600000) {
+                const newStart = new Date(end)
+                newStart.setHours(newStart.getHours() - 1)
+                this.bookingForm.start_datetime = newStart.toISOString().slice(0, 16)
+            }
+        },
+        initializeCalendar() {
+            // Инициализация календаря после монтирования
+            if (this.$refs.fullCalendar) {
+                const calendarApi = this.$refs.fullCalendar.getApi()
+                calendarApi.setOption('height', 'auto')
+                if (this.selectedSauna) {
+                    this.loadEvents()
+                }
             }
         }
     },
     mounted() {
         this.loadSaunas()
-        
-        // Обработка изменения размера экрана
-        window.addEventListener('resize', () => {
-            this.calendarOptions.initialView = this.getInitialView()
-        })
+        this.initializeCalendar()
+    },
+    updated() {
+        if (this.selectedSauna) {
+            this.loadEvents()
+        }
     }
 })
 </script>
@@ -445,5 +553,26 @@ export default defineComponent({
     :deep(.fc-event) {
         font-size: 12px;
     }
+}
+
+.error {
+    border-color: #dc3545;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 4px;
+    display: block;
+}
+
+.form-control:disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+.btn-submit:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
 }
 </style>
