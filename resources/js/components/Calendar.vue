@@ -2,7 +2,7 @@
     <div class="calendar-container">
         <div class="calendar-header">
             <div class="header-controls">
-                <select v-model="selectedSauna" class="sauna-select">
+                <select v-model="selectedSauna" class="sauna-select" @change="onSaunaChange">
                     <option value="">Выберите сауну</option>
                     <option v-for="sauna in saunas" :key="sauna.id" :value="sauna.id">
                         {{ sauna.name }}
@@ -127,10 +127,10 @@ export default defineComponent({
                     center: 'title',
                     right: 'timeGridDay,timeGridWeek,dayGridMonth'
                 },
-                slotMinTime: '08:00:00',
-                slotMaxTime: '22:00:00',
+                slotMinTime: '00:00:00',
+                slotMaxTime: '23:00:00',
                 slotDuration: '01:00:00',
-                selectable: false,
+                selectable: true,
                 selectMirror: true,
                 dayMaxEvents: true,
                 weekends: true,
@@ -141,19 +141,22 @@ export default defineComponent({
                 stickyHeaderDates: true,
                 nowIndicator: true,
                 allDaySlot: false,
-                views: {
-                    timeGridWeek: {
-                        titleFormat: { year: 'numeric', month: 'long', day: 'numeric' }
-                    }
+                eventsSet: this.handleEvents,
+                events: this.fetchEvents,
+                eventDisplay: 'block',
+                eventTimeFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
                 }
             },
             currentEvents: []
         }
     },
     watch: {
-        selectedSauna() {
-            this.loadEvents()
-            this.bookingForm.sauna_id = this.selectedSauna
+        selectedSauna(newValue) {
+            console.log('selectedSauna changed to:', newValue)
+            this.onSaunaChange()
         }
     },
     methods: {
@@ -187,6 +190,68 @@ export default defineComponent({
         },
         handleEvents(events) {
             this.currentEvents = events
+            console.log('Current events updated:', events)
+        },
+        async fetchEvents(fetchInfo, successCallback, failureCallback) {
+            console.log('fetchEvents called with:', { fetchInfo, selectedSauna: this.selectedSauna })
+            
+            if (!this.selectedSauna) {
+                console.log('No sauna selected, returning empty events')
+                successCallback([])
+                return
+            }
+
+            try {
+                const response = await fetch(`/api/schedules?sauna_id=${this.selectedSauna}`)
+                const data = await response.json()
+                console.log('API Response:', data)
+
+                if (!Array.isArray(data)) {
+                    console.error('Expected array of schedules, got:', typeof data)
+                    successCallback([])
+                    return
+                }
+
+                const events = []
+                
+                data.forEach((schedule, idx) => {
+                    console.log(`Processing schedule ${idx}:`, schedule)
+                    
+                    if (!schedule.slots || !Array.isArray(schedule.slots)) {
+                        console.error(`Invalid slots for schedule ${idx}:`, schedule.slots)
+                        return
+                    }
+                    
+                    schedule.slots.forEach((slot, slotIdx) => {
+                        console.log(`Processing slot ${slotIdx} of schedule ${idx}:`, slot)
+                        
+                        if (slot && slot.status === 'booked') {
+                            const date = schedule.date.split('T')[0] // Убираем время из даты
+                            const startTime = slot.time
+                            const endTime = slot.booking_end || this.calculateEndTime(`${date}T${startTime}`)
+                            
+                            const event = {
+                                id: `${schedule.id}-${slot.time}`,
+                                title: 'Забронировано',
+                                start: new Date(`${date}T${startTime}`).toISOString(),
+                                end: new Date(`${date}T${endTime}`).toISOString(),
+                                backgroundColor: '#F44336',
+                                borderColor: '#D32F2F',
+                                display: 'block'
+                            }
+                            
+                            console.log('Created event:', event)
+                            events.push(event)
+                        }
+                    })
+                })
+
+                console.log('Final events array:', events)
+                successCallback(events)
+            } catch (error) {
+                console.error('Error in fetchEvents:', error)
+                failureCallback(error)
+            }
         },
         async loadSaunas() {
             try {
@@ -204,45 +269,61 @@ export default defineComponent({
                 const data = await response.json()
                 console.log('Received data:', data)
 
-                const events = data.map(schedule => {
+                const events = []
+                
+                data.forEach(schedule => {
                     const slots = Array.isArray(schedule.slots) ? schedule.slots : []
-                    console.log('Schedule slots:', slots)
-
-                    const bookedSlots = slots.filter(slot => slot && slot.status === 'booked')
-                    console.log('Booked slots:', bookedSlots)
-
-                    return bookedSlots.map(slot => {
-                        const date = schedule.date
-                        const startTime = slot.time || '00:00:00'
-                        const endTime = slot.booking_end || this.calculateEndTime(`${date}T${startTime}`).split('T')[1]
-                        
-                        const eventStart = `${date}T${startTime}`
-                        const eventEnd = `${date}T${endTime}`
-
-                        console.log('Event times:', { eventStart, eventEnd })
-
-                        return {
-                            id: `${schedule.id}-${slot.time}`,
-                            title: 'Забронировано',
-                            start: eventStart,
-                            end: eventEnd,
-                            backgroundColor: '#F44336',
-                            borderColor: '#D32F2F',
-                            extendedProps: {
-                                client_id: slot.client_id
+                    console.log('Processing schedule date:', schedule.date)
+                    
+                    slots.forEach(slot => {
+                        if (slot && slot.status === 'booked') {
+                            const date = schedule.date
+                            const start = `${date}T${slot.time}`
+                            const end = `${date}T${slot.booking_end || this.calculateEndTime(start)}`
+                            
+                            console.log('Creating event:', {
+                                date,
+                                slotTime: slot.time,
+                                bookingEnd: slot.booking_end,
+                                calculatedEnd: this.calculateEndTime(start),
+                                finalStart: start,
+                                finalEnd: end
+                            })
+                            
+                            const event = {
+                                id: `${schedule.id}-${slot.time}`,
+                                title: 'Забронировано',
+                                start: start,
+                                end: end,
+                                backgroundColor: '#F44336',
+                                borderColor: '#D32F2F',
+                                display: 'block'
                             }
+                            events.push(event)
                         }
                     })
-                }).flat()
+                })
 
                 console.log('Generated events:', events)
 
+                // Обновляем события в календаре
                 if (this.$refs.fullCalendar) {
                     const calendarApi = this.$refs.fullCalendar.getApi()
                     calendarApi.removeAllEvents()
+                    
+                    // Добавляем события напрямую
                     events.forEach(event => {
-                        calendarApi.addEvent(event)
+                        try {
+                            calendarApi.addEvent(event)
+                            console.log('Added event:', event)
+                        } catch (e) {
+                            console.error('Error adding event:', e, event)
+                        }
                     })
+                    
+                    // Проверяем события после добавления
+                    const addedEvents = calendarApi.getEvents()
+                    console.log('Events in calendar after adding:', addedEvents.length, addedEvents)
                 }
             } catch (error) {
                 console.error('Error loading events:', error)
@@ -251,7 +332,7 @@ export default defineComponent({
         calculateEndTime(startTime) {
             const date = new Date(startTime)
             date.setHours(date.getHours() + 1)
-            return date.toISOString()
+            return date.toTimeString().split(' ')[0]
         },
         formatDateTime(date) {
             if (!date) return ''
@@ -346,19 +427,25 @@ export default defineComponent({
             }
         },
         initializeCalendar() {
-            // Инициализация календаря после монтирования
             if (this.$refs.fullCalendar) {
                 const calendarApi = this.$refs.fullCalendar.getApi()
-                calendarApi.setOption('height', 'auto')
-                if (this.selectedSauna) {
-                    this.loadEvents()
-                }
+                calendarApi.setOption('initialView', this.getInitialView())
+                calendarApi.setOption('height', window.innerHeight - 200)
+                this.loadEvents()
             }
-        }
+        },
+        async onSaunaChange() {
+            if (this.$refs.fullCalendar) {
+                const calendarApi = this.$refs.fullCalendar.getApi()
+                calendarApi.refetchEvents()
+            }
+        },
     },
     mounted() {
         this.loadSaunas()
+        console.log('Calendar mounted, ref exists:', !!this.$refs.fullCalendar)
         this.initializeCalendar()
+        this.loadEvents()
     },
     updated() {
         if (this.selectedSauna) {
@@ -371,6 +458,8 @@ export default defineComponent({
 <style scoped>
 .calendar-container {
     padding: 10px;
+    min-height: 100% !important;
+    height: 100vh !important;
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -410,7 +499,8 @@ export default defineComponent({
 }
 
 .calendar {
-    height: calc(100vh - 150px);
+    height: 100vh !important;
+    overflow: auto;
     min-height: 500px;
 }
 

@@ -12,7 +12,7 @@
 </head>
 <body>
     <div id="app">
-        <full-calendar />
+        <calendar/>
     </div>
 </body>
 </html>

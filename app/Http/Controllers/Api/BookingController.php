@@ -106,17 +106,17 @@ class BookingController extends Controller
             // Создаем слоты для каждого часа бронирования
             while ($currentTime < $endDate) {
                 $timeStr = $currentTime->format('H:i:s');
-                $bookedSlots[] = $timeStr;
-                $currentTime->addHour();
-            }
-
-            // Добавляем новые слоты
-            foreach ($bookedSlots as $time) {
+                
+                // Проверяем, существует ли уже слот на это время
                 $slotExists = false;
                 foreach ($slots as &$slot) {
-                    if ($slot['time'] === $time) {
+                    if ($slot['time'] === $timeStr) {
+                        if ($slot['status'] === 'booked') {
+                            throw new \Exception('Выбранное время уже забронировано');
+                        }
                         $slot['status'] = 'booked';
                         $slot['client_id'] = $client->id;
+                        $slot['booking_start'] = $startDate->format('H:i:s');
                         $slot['booking_end'] = $endDate->format('H:i:s');
                         $slotExists = true;
                         break;
@@ -125,12 +125,16 @@ class BookingController extends Controller
 
                 if (!$slotExists) {
                     $slots[] = [
-                        'time' => $time,
+                        'time' => $timeStr,
                         'status' => 'booked',
                         'client_id' => $client->id,
+                        'booking_start' => $startDate->format('H:i:s'),
                         'booking_end' => $endDate->format('H:i:s')
                     ];
                 }
+                
+                $bookedSlots[] = $timeStr;
+                $currentTime->addHour();
             }
 
             // Сортируем слоты по времени
