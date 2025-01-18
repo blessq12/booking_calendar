@@ -1,3 +1,382 @@
+<script>
+import { object, string } from 'yup'
+
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import flatpickr from 'flatpickr'
+import 'flatpickr/dist/flatpickr.css'
+import { Russian } from 'flatpickr/dist/l10n/ru.js'
+import '@mdi/font/css/materialdesignicons.css';
+
+import {useToast} from 'vue-toast-notification';
+import 'vue-toast-notification/dist/theme-sugar.css';
+const toast = useToast({timeout: 3000,position: 'top-right'});
+
+import axios from 'axios';
+
+export default {
+    name: 'Calendar',
+    components: {
+        FullCalendar
+    },
+    data() {
+        return {
+            saunas: [],
+            selectedSauna: null,
+            showModal: false,
+            isLoading: false,
+            validationErrors: {},
+            bookingForm: {
+                sauna_id: null,
+                client_name: '',
+                client_phone: '',
+                start_datetime: '',
+                end_datetime: '',
+                comment: ''
+            },
+            bookingSchema: object().shape({
+                sauna_id: string().required('Выберите сауну'),
+                client_name: string().trim().required('Введите имя клиента'),
+                client_phone: string().trim().required('Введите телефон клиента'),
+                start_datetime: string().matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/, 'Неверный формат даты').required('Выберите время начала'),
+                end_datetime: string().matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/, 'Неверный формат даты').required('Выберите время окончания'),
+                comment: string().trim().nullable()
+            }),
+            calendarOptions: {
+                plugins: [
+                    dayGridPlugin,
+                    timeGridPlugin,
+                    interactionPlugin
+                ],
+                initialView: 'timeGridWeek',
+                slotMinTime: '00:00:00',
+                slotMaxTime: '24:00:00',
+                allDaySlot: false,
+                selectable: true,
+                selectMirror: true,
+                editable: false,
+                dayMaxEvents: true,
+                selectConstraint: {
+                    start: new Date().toISOString(),
+                    end: '2100-01-01'
+                },
+                selectOverlap: false,
+                eventOverlap: false,
+                headerToolbar: false, 
+                slotDuration: '01:00:00',
+                selectMinDistance: 1000,
+                locale: 'ru',
+                events: this.fetchEvents,
+                select: this.handleDateSelect,
+                eventClick: this.handleEventClick,
+                eventsSet: this.handleEvents,
+                nowIndicator: true,
+                height: 'auto',
+                views: {
+                    timeGridWeek: {
+                        titleFormat: { year: 'numeric', month: 'long', day: '2-digit' }
+                    },
+                    timeGridDay: {
+                        titleFormat: { year: 'numeric', month: 'long', day: '2-digit' }
+                    }
+                }
+            },
+            currentEvents: [],
+            showViewModal: false,
+            selectedEvent: null
+        }
+    },
+    watch: {
+        selectedSauna() {
+            this.onSaunaChange();
+        },
+        showModal(isOpen) {
+            if (isOpen) {
+                this.$nextTick(() => {
+                    this.initializeDatePickers();
+                });
+                this.bookingForm.sauna_id = this.selectedSauna;
+            } else {
+                this.destroyDatePickers();
+            }
+        }
+    },
+    methods: {
+        getInitialView() {
+            return window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek'
+        },
+        openBookingModal() {
+            const now = new Date();
+            now.setMinutes(0);
+            now.setSeconds(0);
+            
+            this.bookingForm = {
+                sauna_id: this.selectedSauna,
+                client_name: '',
+                client_phone: '',
+                start_datetime: now.toISOString().slice(0, 16),
+                end_datetime: new Date(now.setHours(now.getHours() + 1)).toISOString().slice(0, 16),
+                comment: ''
+            };
+            this.showModal = true;
+        },
+        handleEventClick(clickInfo) {
+            this.selectedEvent = clickInfo.event;
+            this.showViewModal = true;
+        },
+        handleEvents(events) {
+            this.currentEvents = events
+        },
+        async fetchEvents() {
+            if (!this.selectedSauna) {
+                return []
+            }
+
+            try {
+                const response = await axios.get(`/api/bookings`, {
+                    params: { sauna_id: this.selectedSauna }
+                })
+                const bookings = response.data
+                return bookings.map(booking => ({
+                    id: booking.id,
+                    title: 'Забронировано',
+                    start: booking.start_datetime,
+                    end: booking.end_datetime,
+                    extendedProps: {
+                        client: booking.client,
+                        comment: booking.comment
+                    }
+                }))
+            } catch (error) {
+                toast.error('Ошибка при получении событий: ' + error.message)
+                return []
+            }
+        },
+        async handleDateSelect(selectInfo) {
+            const now = new Date();
+            const selectedStart = new Date(selectInfo.start);
+            
+            if (selectedStart < now) {
+                toast.error('Выбранная дата уже прошла');
+                return;
+            }
+
+            this.bookingForm = {
+                sauna_id: this.selectedSauna,
+                client_name: '',
+                client_phone: '',
+                start_datetime: selectInfo.start,
+                end_datetime: selectInfo.end,
+                comment: ''
+            };
+
+            this.showModal = true;
+        },
+        createBooking() {
+            this.bookingSchema.validate(this.bookingForm, { abortEarly: false })
+                .then(() => {
+                    const postData = { ...this.bookingForm }; // Объединяем данные формы
+                    axios.post('/api/bookings', postData)
+                        .then(() => {
+                            toast.success('Бронирование успешно создано');
+                            this.showModal = false;
+                            this.resetBookingForm(); // Вынес в отдельный метод
+                        })
+                        .catch(err => {
+                            toast.error('Ошибка при создании бронирования: ' + err.response.data.message);
+                        });
+                })
+                .catch(err => {
+                    err.inner.forEach(error => {
+                        toast.error(error.message);
+                    });
+                });
+        },
+        resetBookingForm() {
+            this.bookingForm = {
+                sauna_id: this.selectedSauna,
+                client_name: '',
+                client_phone: '',
+                start_datetime: '',
+                end_datetime: '',
+                comment: ''
+            };
+        },
+        async deleteBooking() {
+            if (!this.selectedEvent) return;
+            if (!confirm('Вы уверены, что хотите удалить эту бронь?')) return;
+
+            try {
+                const response = await axios.delete(`/api/bookings/${this.selectedEvent.id}`);
+
+                if (response.status === 200) {
+                    this.selectedEvent.remove();
+                    this.showViewModal = false;
+                    this.selectedEvent = null;
+                    toast.success('Бронирование успешно удалено');
+                } else {
+                    throw new Error('Ошибка при удалении брони');
+                }
+            } catch (error) {
+                toast.error('Произошла ошибка при удалении брони: ' + error.message);
+            }
+        },
+        calculateEndTime(startTime) {
+            const date = new Date(startTime)
+            date.setHours(date.getHours() + 1)
+            return date.toTimeString().split(' ')[0]
+        },
+        async loadSaunas() {
+            try {
+                const response = await axios.get('/api/saunas')
+                this.saunas = response.data
+                if (this.saunas.length > 0 && !this.selectedSauna) {
+                    this.selectedSauna = this.saunas[0].id
+                    await this.fetchEvents()
+                }
+            } catch (error) {
+                toast.error('Ошибка загрузки саун: ' +  error.message)
+            }
+        },
+        async loadEvents() {
+            if (!this.selectedSauna) return
+
+            try {
+                const response = await axios.get(`/api/bookings`, {
+                    params: { sauna_id: this.selectedSauna }
+                })
+
+                const events = response.data.map(booking => ({
+                    id: booking.id,
+                    title: 'Забронировано',
+                    start: booking.start_datetime,
+                    end: booking.end_datetime,
+                    extendedProps: {
+                        client: booking.client,
+                        comment: booking.comment
+                    }
+                }))
+
+                if (this.$refs.fullCalendar) {
+                    const calendarApi = this.$refs.fullCalendar.getApi()
+                    calendarApi.removeAllEvents()
+                    events.forEach(event => {
+                        try {
+                            calendarApi.addEvent(event)
+                        } catch (e) {
+                            toast.error('Ошибка при добавлении события:' + e.message)
+                        }
+                    })
+                    
+                    // Проверяем события после добавления
+                    const addedEvents = calendarApi.getEvents()
+                }
+            } catch (error) {
+                toast.error('Ошибка загрузки событий:' + error.message)
+            }
+        },
+        initializeCalendar() {
+            if (this.$refs.fullCalendar) {
+                const calendarApi = this.$refs.fullCalendar.getApi()
+                calendarApi.setOption('initialView', this.getInitialView())
+                calendarApi.setOption('height', window.innerHeight - 200)
+                this.loadEvents()
+            }
+        },
+        async onSaunaChange() {
+            if (this.$refs.fullCalendar) {
+                const calendarApi = this.$refs.fullCalendar.getApi()
+                calendarApi.refetchEvents()
+            }
+        },
+        destroyDatePickers() {
+            const startInput = document.getElementById('start_datetime');
+            const endInput = document.getElementById('end_datetime');
+            if (startInput?._flatpickr) {
+                startInput._flatpickr.destroy();
+            }
+            if (endInput?._flatpickr) {
+                endInput._flatpickr.destroy();
+            }
+            this.startPicker = null;
+            this.endPicker = null;
+        },
+        initializeDatePickers() {
+            try {
+                const startInput = document.getElementById('start_datetime');
+                const endInput = document.getElementById('end_datetime');
+                flatpickr(startInput, {
+                    locale: Russian,
+                    enableTime: true,
+                    time_24hr: true,
+                    dateFormat: "Z",
+                    altFormat: "d.m.Y H:i",
+                    altInput: true,
+                    minDate: "today",
+                    minuteIncrement: 60,
+                    defaultHour: new Date().getHours(),
+                    position: 'auto center',
+                    allowInput: false,
+                    onChange: (selectedDates) => {
+                        this.bookingForm.start_datetime = selectedDates[0].toISOString()
+                    }
+                });
+                flatpickr(endInput, {
+                    locale: Russian,
+                    enableTime: true,
+                    time_24hr: true,
+                    dateFormat: "Z",
+                    altFormat: "d.m.Y H:i",
+                    altInput: true,
+                    minDate: "today",
+                    minuteIncrement: 60,
+                    defaultHour: new Date().getHours() + 1,
+                    position: 'auto center',
+                    allowInput: false,
+                    onChange: (selectedDates) => {
+                        this.bookingForm.end_datetime = selectedDates[0].toISOString()
+                    }
+                });
+            } catch (error) {
+                toast.error('Ошибка инициализации календаря');
+            }
+        },
+        switchView(view) {
+            const calendar = this.$refs.fullCalendar.getApi()
+            calendar.changeView(view)
+            this.calendarOptions.initialView = view
+        },
+        prevPeriod() {
+            const calendar = this.$refs.fullCalendar.getApi()
+            calendar.prev()
+        },
+        nextPeriod() {
+            const calendar = this.$refs.fullCalendar.getApi()
+            calendar.next()
+        },
+        goToToday() {
+            const calendar = this.$refs.fullCalendar.getApi()
+            calendar.today()
+        }
+    },
+    mounted() {
+        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        axios.defaults.headers.common = {
+            'X-CSRF-TOKEN': token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+        this.loadSaunas();
+        this.initializeCalendar();
+    },
+    updated() {
+        if (this.selectedSauna) this.loadEvents();
+    }
+}
+</script>
+
 <template>
     <div class="min-h-screen bg-gray-900 p-4 text-gray-100">
         <div class="max-w-7xl mx-auto space-y-6">
@@ -59,9 +438,10 @@
                             </button>
                             <button 
                                 @click="goToToday"
-                                class="px-3 py-2 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors"
+                                class="px-2 py-1.5 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors flex gap-2"
                             >
-                                Сегодня
+                                <i class="mdi mdi-calendar-today text-lg"></i>
+                                <span class="hidden sm:inline">Сегодня</span>
                             </button>
                         </div>
                         <div class="hidden sm:block md:w-1/2">
@@ -69,8 +449,16 @@
                         <!-- Переключатель вида -->
                         <div class="flex items-center bg-gray-700/50 rounded-lg p-1">
                             <button 
+                                @click="switchView('dayGridMonth')"
+                                class="px-3 py-1 rounded-md transition-all duration-200 flex items-center gap-2"
+                                :class="{ 'bg-blue-600 text-white': calendarOptions.initialView === 'dayGridMonth', 'text-gray-400 hover:text-gray-200': calendarOptions.initialView !== 'dayGridMonth' }"
+                            >
+                                <i class="mdi mdi-calendar-month text-lg"></i>
+                                <span class="hidden sm:inline">Месяц</span>
+                            </button>
+                            <button 
                                 @click="switchView('timeGridWeek')"
-                                class="px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2"
+                                class="px-3 py-1 rounded-md transition-all duration-200 flex items-center gap-2"
                                 :class="{ 'bg-blue-600 text-white': calendarOptions.initialView === 'timeGridWeek', 'text-gray-400 hover:text-gray-200': calendarOptions.initialView !== 'timeGridWeek' }"
                             >
                                 <i class="mdi mdi-calendar-week text-lg"></i>
@@ -78,7 +466,7 @@
                             </button>
                             <button 
                                 @click="switchView('timeGridDay')"
-                                class="px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2"
+                                class="px-3 py-1 rounded-md transition-all duration-200 flex items-center gap-2"
                                 :class="{ 'bg-blue-600 text-white': calendarOptions.initialView === 'timeGridDay', 'text-gray-400 hover:text-gray-200': calendarOptions.initialView !== 'timeGridDay' }"
                             >
                                 <i class="mdi mdi-calendar-today text-lg"></i>
@@ -89,11 +477,11 @@
 
                     <!-- Кнопка создания -->
                     <button 
-                        @click="openCreateModal"
+                        @click="this.showModal = true"
                         class="w-full group px-6 py-2.5 bg-blue-600 text-white rounded-xl 
                                hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 
-                               focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200 
-                               flex items-center justify-center gap-2"
+                               focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 
+                               disabled:cursor-not-allowed transition-all duration-200"
                     >
                         <i class="mdi mdi-plus text-xl group-hover:rotate-90 transition-transform duration-300"></i>
                         <span>Создать запись</span>
@@ -165,6 +553,8 @@
                                 <i class="mdi mdi-phone absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                 <input 
                                     v-model="bookingForm.client_phone" 
+                                    v-maska
+                                    data-maska="+7 (###) ###-##-##"
                                     type="tel" 
                                     class="form-input"
                                     :class="{ 'error': validationErrors.client_phone }"
@@ -252,412 +642,39 @@
                 </div>
             </div>
         </div>
+
+        <!-- Модальное окно просмотра записи -->
+        <div v-if="showViewModal" 
+             class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+            <div class="w-full max-w-lg transform bg-gray-800 rounded-xl shadow-2xl border border-gray-700 transition-all p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-semibold text-gray-100 mb-4">Детали бронирования</h2>
+                    <button 
+                        @click="showViewModal = false"
+                        class="p-2 text-gray-400 hover:text-gray-300 rounded-lg hover:bg-gray-700 transition-all duration-200"
+                    >
+                        <i class="mdi mdi-close text-xl"></i>
+                    </button>
+                </div>
+                <p class="text-gray-300">Имя клиента: {{ selectedEvent.extendedProps.client.name }}</p>
+                <p class="text-gray-300">Телефон: <a href="tel:{{ selectedEvent.extendedProps.client.phone }}" class="text-blue-500">{{ selectedEvent.extendedProps.client.phone }}</a></p>
+                <p class="text-gray-300">Комментарий: {{ selectedEvent.extendedProps.comment }}</p>
+                <p class="text-gray-300">Начало: {{ selectedEvent.start.toLocaleString() }}</p>
+                <p class="text-gray-300">Окончание: {{ selectedEvent.end.toLocaleString() }}</p>
+                <div class="flex items-center justify-end">
+                    <button 
+                        class="btn-primary flex items-center gap-2"
+                        @click="deleteBooking"
+                    >
+                        <i class="mdi mdi-delete"></i>
+                        Удалить
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
-
-<script>
-import { defineComponent, ref } from 'vue'
-import FullCalendar from '@fullcalendar/vue3'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin from '@fullcalendar/interaction'
-import flatpickr from 'flatpickr'
-import 'flatpickr/dist/flatpickr.css'
-import { Russian } from 'flatpickr/dist/l10n/ru.js'
-
-export default defineComponent({
-    name: 'Calendar',
-    components: {
-        FullCalendar
-    },
-    data() {
-        return {
-            saunas: [],
-            selectedSauna: '',
-            showModal: false,
-            isLoading: false,
-            validationErrors: {},
-            bookingForm: {
-                sauna_id: '',
-                client_name: '',
-                client_phone: '',
-                start_datetime: '',
-                end_datetime: '',
-                comment: ''
-            },
-            calendarOptions: {
-                plugins: [
-                    dayGridPlugin,
-                    timeGridPlugin,
-                    interactionPlugin
-                ],
-                initialView: 'timeGridWeek',
-                slotMinTime: '00:00:00',
-                slotMaxTime: '24:00:00',
-                allDaySlot: false,
-                selectable: true,
-                selectMirror: true,
-                editable: false,
-                dayMaxEvents: true,
-                selectConstraint: {
-                    start: new Date().toISOString(),
-                    end: '2100-01-01'
-                },
-                selectOverlap: false,
-                eventOverlap: false,
-                headerToolbar: false, // Отключаем встроенную панель управления
-                slotDuration: '01:00:00',
-                selectMinDistance: 1000,
-                locale: 'ru',
-                events: this.fetchEvents,
-                select: this.handleDateSelect,
-                eventClick: this.handleEventClick,
-                eventsSet: this.handleEvents,
-                nowIndicator: true,
-                height: 'auto',
-                views: {
-                    timeGridWeek: {
-                        titleFormat: { year: 'numeric', month: 'long', day: '2-digit' }
-                    },
-                    timeGridDay: {
-                        titleFormat: { year: 'numeric', month: 'long', day: '2-digit' }
-                    }
-                }
-            },
-            startPicker: null,
-            endPicker: null,
-            currentEvents: []
-        }
-    },
-    watch: {
-        selectedSauna(newValue) {
-            console.log('selectedSauna changed to:', newValue)
-            this.onSaunaChange()
-        }
-    },
-    methods: {
-        getInitialView() {
-            return window.innerWidth < 768 ? 'timeGridDay' : 'timeGridWeek'
-        },
-        openCreateModal() {
-            this.showModal = true
-        },
-        openBookingModal() {
-            const now = new Date()
-            now.setMinutes(0)
-            now.setSeconds(0)
-            
-            const end = new Date(now)
-            end.setHours(end.getHours() + 1)
-            
-            this.bookingForm = {
-                sauna_id: this.selectedSauna,
-                client_name: '',
-                client_phone: '',
-                start_datetime: now.toISOString().slice(0, 16),
-                end_datetime: end.toISOString().slice(0, 16),
-                comment: ''
-            }
-            this.showModal = true
-        },
-        handleEventClick(clickInfo) {
-            // Показываем информацию о существующей записи
-            alert(`
-                Бронирование
-                Время: ${this.formatDateTime(clickInfo.event.start)}
-                До: ${this.formatDateTime(clickInfo.event.end)}
-            `)
-        },
-        handleEvents(events) {
-            this.currentEvents = events
-            console.log('Current events updated:', events)
-        },
-        async fetchEvents() {
-            if (!this.selectedSauna) {
-                return []
-            }
-
-            try {
-                const response = await fetch(`/api/bookings?sauna_id=${this.selectedSauna}`)
-                const bookings = await response.json()
-                
-                return bookings.map(booking => ({
-                    id: booking.id,
-                    title: 'Забронировано',
-                    start: booking.start_datetime,
-                    end: booking.end_datetime,
-                    backgroundColor: '#ef4444',
-                    borderColor: '#dc2626'
-                }))
-            } catch (error) {
-                console.error('Error fetching events:', error)
-                return []
-            }
-        },
-        async handleDateSelect(selectInfo) {
-            const now = new Date()
-            const selectedStart = new Date(selectInfo.start)
-            
-            // Проверяем, что выбранное время не раньше текущего
-            if (selectedStart < now) {
-                alert('Нельзя создать бронь на прошедшее время')
-                return
-            }
-            
-            // Форматируем даты в MySQL формат
-            const startDate = new Date(selectInfo.start)
-            const endDate = new Date(selectInfo.end)
-            
-            this.bookingForm = {
-                sauna_id: this.selectedSauna,
-                client_name: '',
-                client_phone: '',
-                start_datetime: startDate.toISOString().slice(0, 19).replace('T', ' '),
-                end_datetime: endDate.toISOString().slice(0, 19).replace('T', ' '),
-                comment: ''
-            }
-            console.log('Booking form initialized:', this.bookingForm)
-            this.showModal = true
-        },
-        async createBooking() {
-            if (!this.selectedSauna) {
-                alert('Выберите сауну')
-                return
-            }
-
-            try {
-                this.isLoading = true
-                console.log('Sending booking data:', this.bookingForm)
-                
-                const response = await fetch('/api/bookings', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify(this.bookingForm)
-                })
-
-                if (!response.ok) {
-                    const error = await response.json()
-                    throw new Error(error.message || 'Ошибка при создании бронирования')
-                }
-
-                const booking = await response.json()
-                console.log('Created booking:', booking)
-
-                // Добавляем событие в календарь
-                if (this.$refs.fullCalendar) {
-                    const calendarApi = this.$refs.fullCalendar.getApi()
-                    calendarApi.addEvent({
-                        id: booking.id,
-                        title: 'Забронировано',
-                        start: booking.start_datetime,
-                        end: booking.end_datetime,
-                        backgroundColor: '#ef4444',
-                        borderColor: '#dc2626'
-                    })
-                }
-
-                this.showModal = false
-                this.resetForm()
-            } catch (error) {
-                console.error('Error creating booking:', error)
-                alert(error.message)
-            } finally {
-                this.isLoading = false
-            }
-        },
-        async deleteBooking() {
-            if (!this.selectedBooking) return
-            if (!confirm('Вы уверены, что хотите удалить эту бронь?')) return
-
-            try {
-                this.isLoading = true
-                const response = await fetch(`/api/bookings/${this.selectedBooking.bookingId}`, {
-                    method: 'DELETE'
-                })
-
-                if (!response.ok) {
-                    throw new Error('Ошибка при удалении брони')
-                }
-
-                this.selectedBooking.event.remove()
-                this.showBookingInfo = false
-                this.selectedBooking = null
-            } catch (error) {
-                console.error('Error deleting booking:', error)
-                alert('Произошла ошибка при удалении брони')
-            } finally {
-                this.isLoading = false
-            }
-        },
-        calculateEndTime(startTime) {
-            const date = new Date(startTime)
-            date.setHours(date.getHours() + 1)
-            return date.toTimeString().split(' ')[0]
-        },
-        formatDateTime(date) {
-            if (!date) return ''
-            return new Date(date).toLocaleString('ru-RU', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            })
-        },
-        async loadSaunas() {
-            try {
-                const response = await fetch('/api/saunas')
-                this.saunas = await response.json()
-                if (this.saunas.length > 0 && !this.selectedSauna) {
-                    this.selectedSauna = this.saunas[0].id
-                    await this.fetchEvents() // Загружаем события для выбранной сауны
-                }
-            } catch (error) {
-                console.error('Error loading saunas:', error)
-            }
-        },
-        async loadEvents() {
-            if (!this.selectedSauna) return
-
-            try {
-                const response = await fetch(`/api/bookings?sauna_id=${this.selectedSauna}`)
-                const bookings = await response.json()
-                console.log('Received bookings:', bookings)
-
-                const events = bookings.map(booking => ({
-                    id: booking.id,
-                    title: 'Забронировано',
-                    start: booking.start_datetime,
-                    end: booking.end_datetime,
-                    backgroundColor: '#ef4444',
-                    borderColor: '#dc2626'
-                }))
-
-                console.log('Generated events:', events)
-
-                // Обновляем события в календаре
-                if (this.$refs.fullCalendar) {
-                    const calendarApi = this.$refs.fullCalendar.getApi()
-                    calendarApi.removeAllEvents()
-                    
-                    // Добавляем события напрямую
-                    events.forEach(event => {
-                        try {
-                            calendarApi.addEvent(event)
-                            console.log('Added event:', event)
-                        } catch (e) {
-                            console.error('Error adding event:', e, event)
-                        }
-                    })
-                    
-                    // Проверяем события после добавления
-                    const addedEvents = calendarApi.getEvents()
-                    console.log('Events in calendar after adding:', addedEvents.length, addedEvents)
-                }
-            } catch (error) {
-                console.error('Error loading events:', error)
-            }
-        },
-        initializeCalendar() {
-            if (this.$refs.fullCalendar) {
-                const calendarApi = this.$refs.fullCalendar.getApi()
-                calendarApi.setOption('initialView', this.getInitialView())
-                calendarApi.setOption('height', window.innerHeight - 200)
-                this.loadEvents()
-            }
-        },
-        async onSaunaChange() {
-            if (this.$refs.fullCalendar) {
-                const calendarApi = this.$refs.fullCalendar.getApi()
-                calendarApi.refetchEvents()
-            }
-        },
-        resetForm() {
-            this.bookingForm = {
-                sauna_id: this.selectedSauna,
-                client_name: '',
-                client_phone: '',
-                start_datetime: '',
-                end_datetime: '',
-                comment: ''
-            }
-            this.validationErrors = {}
-        },
-        getMinStartTime() {
-            const now = new Date()
-            return now.toISOString().slice(0, 16) // Формат YYYY-MM-DDTHH:mm для input datetime-local
-        },
-        initializeDatePickers() {
-            const now = new Date()
-            const config = {
-                enableTime: true,
-                time_24hr: true,
-                dateFormat: "Y-m-d H:i",
-                locale: Russian,
-                minuteIncrement: 60,
-                minDate: now,
-                onChange: this.handleDateChange
-            }
-
-            this.startPicker = flatpickr("#start_datetime", {
-                ...config,
-                onChange: (selectedDates) => {
-                    if (selectedDates[0]) {
-                        this.bookingForm.start_datetime = this.formatDateTime(selectedDates[0])
-                        // Устанавливаем минимальную дату для конца брони
-                        this.endPicker.set('minDate', selectedDates[0])
-                    }
-                }
-            })
-
-            this.endPicker = flatpickr("#end_datetime", {
-                ...config,
-                onChange: (selectedDates) => {
-                    if (selectedDates[0]) {
-                        this.bookingForm.end_datetime = this.formatDateTime(selectedDates[0])
-                    }
-                }
-            })
-        },
-        handleDateChange() {
-            console.log('Date changed')
-        },
-        switchView(view) {
-            const calendar = this.$refs.fullCalendar.getApi()
-            calendar.changeView(view)
-            this.calendarOptions.initialView = view
-        },
-        prevPeriod() {
-            const calendar = this.$refs.fullCalendar.getApi()
-            calendar.prev()
-        },
-        nextPeriod() {
-            const calendar = this.$refs.fullCalendar.getApi()
-            calendar.next()
-        },
-        goToToday() {
-            const calendar = this.$refs.fullCalendar.getApi()
-            calendar.today()
-        }
-    },
-    mounted() {
-        this.loadSaunas()
-        console.log('Calendar mounted, ref exists:', !!this.$refs.fullCalendar)
-        this.initializeCalendar()
-        this.loadEvents()
-        this.initializeDatePickers()
-    },
-    updated() {
-        if (this.selectedSauna) {
-            this.loadEvents()
-        }
-    }
-})
-</script>
 
 <style>
 /* Base styles */

@@ -13,7 +13,7 @@ use App\Http\Controllers\BookingController;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('api')->group(function () {
+Route::middleware(['web'])->group(function () {
     Route::get('/saunas', [SaunaController::class, 'index']);
     Route::get('/schedules', [ScheduleController::class, 'index']);
     Route::get('/bookings', [BookingController::class, 'index']);

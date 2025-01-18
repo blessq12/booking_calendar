@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Client;
+use App\Models\Sauna;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -39,22 +40,23 @@ class BookingController extends Controller
             'sauna_id' => 'required|exists:saunas,id',
             'client_name' => 'required|string|max:255',
             'client_phone' => 'required|string|max:20',
-            'start_datetime' => 'required|date_format:Y-m-d H:i:s',
-            'end_datetime' => 'required|date_format:Y-m-d H:i:s|after:start_datetime',
-            'comment' => 'nullable|string'
+            'start_datetime' => 'required|date',
+            'end_datetime' => 'required|date|after_or_equal:start_datetime'
         ]);
 
-        // Проверяем, нет ли пересечений с существующими бронями
+
+
+        // Проверяем наличие конфликтующих бронирований для выбранной сауны
         $conflictingBookings = Booking::where('sauna_id', $request->sauna_id)
-            ->where(function($query) use ($request) {
-                $query->whereBetween('start_datetime', [$request->start_datetime, $request->end_datetime])
-                    ->orWhereBetween('end_datetime', [$request->start_datetime, $request->end_datetime])
-                    ->orWhere(function($q) use ($request) {
-                        $q->where('start_datetime', '<=', $request->start_datetime)
-                            ->where('end_datetime', '>=', $request->end_datetime);
-                    });
+            ->where(function ($query) use ($request) {
+                // Проверяем, пересекаются ли временные интервалы
+                $query->where(function ($q) use ($request) {
+                    $q->where('start_datetime', '<', $request->end_datetime) // Начало существующего до конца нового
+                        ->where('end_datetime', '>', $request->start_datetime); // Конец существующего после начала нового
+                });
             })->exists();
 
+        // Если есть конфликтующие бронирования, возвращаем сообщение об ошибке
         if ($conflictingBookings) {
             return response()->json(['message' => 'Выбранное время уже занято'], 422);
         }
@@ -79,7 +81,6 @@ class BookingController extends Controller
 
             DB::commit();
             return response()->json($booking->load('client'));
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Ошибка при создании бронирования: ' . $e->getMessage());
