@@ -5,7 +5,7 @@ use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\MainController;
 
 
-Route::domain('booking.' . env('APP_DOMAIN'))->group(function () {
+Route::domain('booking.' . env('APP_URL'))->group(function () {
     Route::controller(ScheduleController::class)->group(function () {
         Route::get('/', 'index')->name('index');
     });
