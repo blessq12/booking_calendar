@@ -12,9 +12,7 @@ Route::domain('booking.' . env('APP_URL'))->group(function () {
 });
 
 Route::controller(MainController::class)->group(function () {
-    Route::get('/', function () {
-        return 'index page';
-    });
+    Route::get('/', 'index')->name('index');
 });
 
 Route::prefix('api')->group(function () {

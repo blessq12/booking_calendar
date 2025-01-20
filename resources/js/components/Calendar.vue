@@ -428,13 +428,13 @@ export default {
                                 @click="prevPeriod"
                                 class="p-2 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors"
                             >
-                                <i class="fa fa-chevron-left "></i>
+                                <i class="mdi mdi-chevron-left"></i>
                             </button>
                             <button 
                                 @click="nextPeriod"
                                 class="p-2 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors"
                             >
-                                <i class="fa fa-chevron-right"></i>
+                                <i class="mdi mdi-chevron-right"></i>
                             </button>
                             <button 
                                 @click="goToToday"
