@@ -11,6 +11,8 @@ Route::domain('booking.' . env('APP_URL'))->group(function () {
     });
 });
 
+Route::get('/booking', [ScheduleController::class, 'index']);
+
 Route::controller(MainController::class)->group(function () {
     Route::get('/', 'index')->name('index');
 });

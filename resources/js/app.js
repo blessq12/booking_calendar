@@ -1,35 +1,23 @@
-/**
- * First we will load all of this project's JavaScript dependencies which
- * includes Vue and other libraries. It is a great starting point when
- * building robust, powerful web applications using Vue and Laravel.
- */
-
-import './bootstrap';
-import { createApp } from 'vue';
-
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { vMaska } from 'maska/vue';
-/**
- * Next, we will create a fresh Vue application instance. You may then begin
- * registering components with the application instance so they are ready
- * to use in your application's views. An example is included for you.
- */
-
+import "@mdi/font/css/materialdesignicons.min.css";
+import { vMaska } from "maska/vue";
+import { createApp } from "vue";
+import "../css/app.css";
+import "./bootstrap";
 const app = createApp({});
 
-app.directive('maska', vMaska);
-/**
- * The following block of code may be used to automatically register your
- * Vue components. It will recursively scan this directory for the Vue
- * components and automatically register them with their "basename".
- *
- * Eg. ./components/ExampleComponent.vue -> <example-component></example-component>
- */
+app.directive("maska", vMaska);
 
-Object.entries(import.meta.glob('./**/*.vue', { eager: true })).forEach(([path, definition]) => {
-    app.component(path.split('/').pop().replace(/\.\w+$/, ''), definition.default);
-});
+Object.entries(import.meta.glob("./**/*.vue", { eager: true })).forEach(
+    ([path, definition]) => {
+        app.component(
+            path
+                .split("/")
+                .pop()
+                .replace(/\.\w+$/, ""),
+            definition.default
+        );
+    }
+);
 
 /**
  * Finally, we will attach the application instance to a HTML element with
@@ -37,4 +25,4 @@ Object.entries(import.meta.glob('./**/*.vue', { eager: true })).forEach(([path, 
  * scaffolding. Otherwise, you will need to add an element yourself.
  */
 
-app.mount('#app');
+app.mount("#app");
