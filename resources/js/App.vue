@@ -67,6 +67,12 @@ export default {
             stagger: 0.2,
             ease: "power2.inOut",
         });
+        gsap.from(this.$refs.heroImage, {
+            x: -100,
+            scale: 2,
+            duration: 6,
+            ease: "power2.inOut",
+        });
     },
     methods: {
         hoverButton(button) {
@@ -89,10 +95,13 @@ export default {
 
 <template>
     <Navbar />
-    <div
-        class="bg-image bg-cover bg-center bg-no-repeat relative"
-        style="background-image: url('/images/hero.png')"
-    >
+    <div class="relative overflow-hidden">
+        <img
+            src="/images/hero.png"
+            alt="hero"
+            ref="heroImage"
+            class="w-full h-full object-cover absolute inset-0"
+        />
         <div
             class="absolute inset-0 bg-gradient-to-br from-black/70 to-red-500/50"
         ></div>

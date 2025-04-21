@@ -22,8 +22,8 @@
 
 <body>
     @if (Auth::check())
-        <div class="bg-gradient-to-b from-blue-500 to-blue-600 py-2">
-            <div class="container mx-auto px-4 flex justify-between items-center">
+        <div class="bg-gradient-to-b from-blue-500 to-blue-600 py-2 mx-auto max-w-7xl">
+            <div class="container mx-auto px-2 flex justify-between items-center">
                 <p class="text-white text-sm">Привет, {{ Auth::user()->name }}</p>
                 <a href="{{ route('logout') }}" class=" text-sm text-white">Выйти</a>
             </div>
