@@ -3,15 +3,25 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\MainController;
+use App\Http\Controllers\AuthController;
 
+// Route::domain('booking.' . env('APP_URL'))
+//     ->middleware('auth')
+//     ->group(function () {
+//         Route::controller(ScheduleController::class)->group(function () {
+//             Route::get('/', 'index')->name('index');
+//         });
+//     });
 
-Route::domain('booking.' . env('APP_URL'))->group(function () {
-    Route::controller(ScheduleController::class)->group(function () {
-        Route::get('/', 'index')->name('index');
-    });
+Route::middleware('auth')->group(function () {
+    Route::get('/booking', [ScheduleController::class, 'index'])->name('booking');
 });
 
-Route::get('/booking', [ScheduleController::class, 'index']);
+Route::controller(AuthController::class)->group(function () {
+    Route::get('/login', 'login')->name('login');
+    Route::post('/authorize', 'authorize')->name('authorize');
+    Route::get('/logout', 'logout')->name('logout');
+});
 
 Route::controller(MainController::class)->group(function () {
     Route::get('/', 'index')->name('index');
