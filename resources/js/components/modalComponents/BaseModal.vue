@@ -144,7 +144,9 @@ onUnmounted(() => {
         class="fixed inset-0 z-50 overflow-y-auto"
         @click="hideModal"
     >
-        <div class="flex min-h-screen items-center justify-center p-4">
+        <div
+            class="flex min-h-[calc(100vh-1px)] items-center justify-center p-4"
+        >
             <div
                 ref="overlayRef"
                 class="fixed inset-0 bg-black/50 backdrop-blur-sm"
