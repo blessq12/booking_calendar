@@ -166,52 +166,57 @@ class BookingController extends Controller
         if (!$sauna_id) {
             return response()->json(['message' => 'Сауна не указана'], 422);
         }
-        $startDate = $request->query('start_date', now()->startOfDay());
-        $endDate = $request->query('end_date', now()->addDays(30));
 
-        $sauna = \App\Models\Sauna::find($sauna_id);
+        $startDate = Carbon::parse($request->query('start_date', now()->startOfDay()));
+        $endDate = Carbon::parse($request->query('end_date', now()->addDays(30)));
 
-
-        $bookings = [];
-        foreach ($sauna->bookings as $booking) {
-            $bookings[] = [
-                'id' => $booking->id,
-                'title' => 'Забронировано',
-                'start' => $booking->start_datetime,
-                'end' => $booking->end_datetime,
-                'extendedProps' => [
-                    'client_name' => $booking->client->name,
-                    'client_phone' => $booking->client->phone,
-                    'price' => $booking->price,
-                    'prepayment' => $booking->prepayment,
-                    'comment' => $booking->comment ?? null,
-                    'type' => $booking->type == 'cash' ? 'Наличные' : ($booking->type == 'card' ? 'Карта' : 'Перевод')
-                ]
-            ];
-        }
+        $bookings = \App\Models\Booking::with(['client', 'sauna'])
+            ->where('sauna_id', $sauna_id)
+            ->where('start_datetime', '>=', $startDate)
+            ->where('end_datetime', '<=', $endDate)
+            ->get()
+            ->map(function ($booking) {
+                return [
+                    'id' => $booking->id,
+                    'title' => 'Бронь: ' . $booking->client->name,
+                    'start' => $booking->start_datetime,
+                    'end' => $booking->end_datetime,
+                    'extendedProps' => [
+                        'client_name' => $booking->client->name,
+                        'client_phone' => $booking->client->phone,
+                        'comment' => $booking->comment,
+                        'type' => $booking->type == 'cash' ? 'Наличные' : ($booking->type == 'card' ? 'Карта' : 'Перевод'),
+                        'price' => $booking->price,
+                        'prepayment' => $booking->prepayment,
+                        'sauna_id' => $booking->sauna_id
+                    ]
+                ];
+            });
 
         return response()->json($bookings);
     }
 
-    public function getClientBookings(Client $client)
+    public function getClientBookings($client_id)
     {
-        $schedules = Schedule::whereJsonContains('slots', ['client_id' => $client->id])
-            ->where('date', '>=', now()->startOfDay())
-            ->get();
+        $client = \App\Models\Client::findOrFail($client_id);
+
+        if (!$client) {
+            return response()->json(['message' => 'Клиент не найден'], 422);
+        }
 
         $bookings = [];
-        foreach ($schedules as $schedule) {
-            foreach ($schedule->slots as $slot) {
-                if ($slot['client_id'] === $client->id) {
-                    $bookings[] = [
-                        'id' => $schedule->id . '_' . $slot['time'],
-                        'sauna' => $schedule->sauna->name,
-                        'date' => $schedule->date,
-                        'start_time' => $slot['booking_start'],
-                        'end_time' => $slot['booking_end']
-                    ];
-                }
-            }
+        foreach ($client->bookings as $booking) {
+            $bookings[] = [
+                'id' => $booking->id,
+                'sauna' => $booking->sauna->name,
+                'date' => $booking->start_datetime,
+                'start_time' => $booking->start_datetime,
+                'end_time' => $booking->end_datetime,
+                'comment' => $booking->comment ?? null,
+                'price' => $booking->price,
+                'prepayment' => $booking->prepayment,
+                'type' => $booking->type == 'cash' ? 'Наличные' : ($booking->type == 'card' ? 'Карта' : 'Перевод')
+            ];
         }
 
         return response()->json($bookings);
@@ -256,5 +261,14 @@ class BookingController extends Controller
             DB::rollBack();
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    public function update(Request $request, $bookingId)
+    {
+        $booking = \App\Models\Booking::findOrFail($bookingId);
+
+        $booking->update($request->all());
+
+        return response()->json(['message' => 'Бронирование успешно обновлено']);
     }
 }

@@ -56,6 +56,9 @@ export default {
                 eventClick: this.handleEventClick,
                 eventsSet: this.handleEvents,
                 datesSet: this.handleDatesSet,
+                eventDrop: this.handleEventDrop,
+                eventResize: this.handleEventResize,
+                eventChange: this.handleEventChange,
                 nowIndicator: true,
                 height: "auto",
                 views: {
@@ -92,7 +95,6 @@ export default {
                     startDate: fetchInfo.startStr,
                     endDate: fetchInfo.endStr,
                 });
-                // console.log(this.calendarStore.getAllEvents);
                 return this.calendarStore.getAllEvents;
             } catch (error) {
                 console.error("Error fetching events:", error);
@@ -101,11 +103,34 @@ export default {
         },
 
         handleDateSelect(selectInfo) {
+            const now = new Date();
+            const selectedStart = new Date(selectInfo.start);
+
+            // Проверяем, что выбранная дата не в прошлом
+            if (selectedStart < now) {
+                this.$toast.error(
+                    "Нельзя создать бронирование на прошедшее время"
+                );
+                return;
+            }
+
+            const duration =
+                (selectInfo.end - selectInfo.start) / (1000 * 60 * 60);
+            if (duration < 1) {
+                this.$toast.error("Минимальное время бронирования - 1 час");
+                return;
+            }
+
             this.appStore.setSelectedDateRange(
                 selectInfo.start,
                 selectInfo.end
             );
-            this.appStore.openModal("create");
+
+            this.appStore.openModal("create", {
+                start: selectInfo.start,
+                end: selectInfo.end,
+                sauna_id: this.appStore.selectedSauna,
+            });
         },
 
         handleEventClick(clickInfo) {
@@ -114,6 +139,45 @@ export default {
 
         handleDatesSet(dateInfo) {
             this.appStore.setSelectedDate(dateInfo.start);
+        },
+
+        handleEventDrop(dropInfo) {
+            try {
+                this.calendarStore.moveBooking({
+                    id: dropInfo.event.id,
+                    start: dropInfo.event.start,
+                    end: dropInfo.event.end,
+                });
+            } catch (error) {
+                console.error("Error moving event:", error);
+                dropInfo.revert();
+            }
+        },
+
+        handleEventResize(resizeInfo) {
+            try {
+                this.calendarStore.resizeBooking({
+                    id: resizeInfo.event.id,
+                    start: resizeInfo.event.start,
+                    end: resizeInfo.event.end,
+                });
+            } catch (error) {
+                console.error("Error resizing event:", error);
+                resizeInfo.revert();
+            }
+        },
+
+        handleEventChange(changeInfo) {
+            try {
+                this.calendarStore.updateBooking({
+                    id: changeInfo.event.id,
+                    start: changeInfo.event.start,
+                    end: changeInfo.event.end,
+                });
+            } catch (error) {
+                console.error("Error updating event:", error);
+                changeInfo.revert();
+            }
         },
 
         initializeCalendar() {

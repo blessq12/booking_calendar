@@ -26,14 +26,17 @@ export const useCalendarStore = defineStore("calendar", {
 
                 this.events = response.data.map((booking) => ({
                     id: booking.id,
-                    title: `Бронь: ${booking.client_name}`,
-                    start: booking.start_datetime,
-                    end: booking.end_datetime,
+                    title: `Бронь: ${booking.extendedProps.client_name}`,
+                    start: booking.start,
+                    end: booking.end,
                     extendedProps: {
-                        client_name: booking.client_name,
-                        client_phone: booking.client_phone,
-                        comment: booking.comment,
-                        sauna_id: booking.sauna_id,
+                        client_name: booking.extendedProps.client_name,
+                        client_phone: booking.extendedProps.client_phone,
+                        comment: booking.extendedProps.comment,
+                        sauna_id: booking.extendedProps.sauna_id,
+                        price: booking.extendedProps.price,
+                        prepayment: booking.extendedProps.prepayment,
+                        type: booking.extendedProps.type,
                     },
                 }));
 
@@ -114,6 +117,57 @@ export const useCalendarStore = defineStore("calendar", {
         // Очистка ошибок
         clearError() {
             this.error = null;
+        },
+
+        async updateBooking(eventData) {
+            const confirmation = confirm(
+                "Вы уверены, что хотите изменить бронирование?"
+            );
+            if (!confirmation) return;
+
+            if (this.isLoading) return;
+            this.isLoading = true;
+            this.error = null;
+
+            try {
+                const response = await axios.put(
+                    `/api/bookings/${eventData.id}`,
+                    {
+                        start_datetime: eventData.start,
+                        end_datetime: eventData.end,
+                    }
+                );
+
+                // Обновляем событие в локальном состоянии
+                this.events = this.events.map((event) =>
+                    event.id === eventData.id
+                        ? {
+                              ...event,
+                              start: eventData.start,
+                              end: eventData.end,
+                          }
+                        : event
+                );
+
+                return response.data;
+            } catch (error) {
+                this.error =
+                    error.response?.data?.message ||
+                    "Ошибка при обновлении брони";
+                throw this.error;
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        // Изменение размера события
+        async resizeBooking(eventData) {
+            return this.updateBooking(eventData);
+        },
+
+        // Перетаскивание события
+        async moveBooking(eventData) {
+            return this.updateBooking(eventData);
         },
     },
 

@@ -17,6 +17,7 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('bookings')->group(function () {
         Route::get('/', [BookingController::class, 'index']);
         Route::post('/', [BookingController::class, 'store']);
+        Route::put('/{booking}', [BookingController::class, 'update']);
         Route::delete('/{booking}', [BookingController::class, 'destroy']);
     });
 
