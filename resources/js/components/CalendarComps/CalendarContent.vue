@@ -257,7 +257,7 @@ export default {
                 <FullCalendar
                     ref="fullCalendar"
                     :options="calendarOptions"
-                    class="calendar-height"
+                    class="calendar-height modern-calendar"
                     @select="handleDateSelect"
                     @eventClick="handleEventClick"
                     @datesSet="handleDatesSet"
@@ -270,4 +270,81 @@ export default {
     </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.modern-calendar {
+    --fc-border-color: rgba(75, 85, 99, 0.3);
+    --fc-today-bg-color: rgba(59, 130, 246, 0.1);
+    --fc-neutral-bg-color: rgba(31, 41, 55, 0.7);
+    --fc-list-event-hover-bg-color: rgba(55, 65, 81, 0.7);
+    --fc-theme-standard-border-color: rgba(75, 85, 99, 0.3);
+}
+
+:deep(.fc) {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+:deep(.fc-timegrid-slot-label),
+:deep(.fc-col-header-cell) {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+:deep(.fc-timegrid-slot) {
+    height: 3rem !important;
+}
+
+:deep(.fc-scrollgrid-section-header th) {
+    padding: 0.75rem 0;
+    background-color: rgba(31, 41, 55, 0.7);
+}
+
+:deep(.fc-event) {
+    border-radius: 0.375rem;
+    border: none;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+}
+
+:deep(.fc-timegrid-event-harness) {
+    margin: 0 2px;
+}
+
+:deep(.fc-timegrid-now-indicator-line) {
+    border-color: #ef4444;
+}
+
+:deep(.fc-timegrid-now-indicator-arrow) {
+    border-color: #ef4444;
+    border-width: 5px;
+}
+
+:deep(.fc-button) {
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+:deep(.fc-highlight) {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+:deep(.fc-day-today) {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+:deep(.fc-timegrid-axis) {
+    padding: 0.5rem;
+}
+
+:deep(.fc-timegrid-slot-label-cushion) {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+:deep(.fc-col-header-cell-cushion) {
+    padding: 0.5rem;
+    color: #e5e7eb;
+}
+</style>

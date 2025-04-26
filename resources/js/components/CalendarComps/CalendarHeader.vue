@@ -127,7 +127,7 @@ export default {
                     @click="openSearchModal"
                     @mouseenter="animateTopMenuHover($event.target)"
                     @mouseleave="animateTopMenuHoverOut($event.target)"
-                    class="top-menu-item flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer"
+                    class="top-menu-item flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer md:hidden"
                 >
                     <i
                         class="mdi mdi-magnify text-md font-bold text-blue-500"
@@ -152,7 +152,7 @@ export default {
                         <p class="text-xs text-gray-400 mb-2 py-1">
                             Выберите сауну
                         </p>
-                        <div class="grid grid-cols-4 md:grid-cols-2 gap-2">
+                        <div class="grid grid-cols-2 md:grid-cols-2 gap-2">
                             <button
                                 v-for="sauna in saunas"
                                 :key="sauna.id"
@@ -211,7 +211,7 @@ export default {
                             <div class="w-full rounded-full">
                                 <button
                                     @click="openSearchModal"
-                                    class="w-full rounded-md border border-gray-700 py-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
+                                    class="hidden md:flex w-full rounded-md border border-gray-700 py-2 items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
                                 >
                                     <i
                                         class="mdi mdi-magnify text-blue-500"
