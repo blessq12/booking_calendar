@@ -7,9 +7,9 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Букинг | Тепло на белой</title>
     <meta name="author" content="Andrew Korobkov">
-    <meta name="robots" content="index, follow">
-    <meta name="google" content="index, follow">
-    <meta name="bing" content="index, follow">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="google" content="noindex, nofollow">
+    <meta name="bing" content="noindex, nofollow">
     <link rel="icon" type="image/png" href="/images/favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/images/favicon/favicon.svg" />
     <link rel="shortcut icon" href="/images/favicon/favicon.ico" />
@@ -23,7 +23,7 @@
 <body>
     @if (Auth::check())
         <div class="bg-gradient-to-b from-blue-500 to-blue-600 py-2 mx-auto max-w-7xl">
-            <div class="container mx-auto px-2 flex justify-between items-center">
+            <div class="mx-auto max-w-7xl px-4 md:px-6 flex justify-between items-center">
                 <p class="text-white text-sm">Привет, {{ Auth::user()->name }}</p>
                 <a href="{{ route('logout') }}" class=" text-sm text-white">Выйти</a>
             </div>

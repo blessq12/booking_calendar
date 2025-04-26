@@ -1,12 +1,15 @@
 import "@mdi/font/css/materialdesignicons.min.css";
 import { vMaska } from "maska/vue";
+import { createPinia } from "pinia";
 import { createApp } from "vue";
 import "../css/app.css";
 import "./bootstrap";
+
 const app = createApp({});
+const pinia = createPinia();
 
 app.directive("maska", vMaska);
-
+app.use(pinia);
 Object.entries(import.meta.glob("./**/*.vue", { eager: true })).forEach(
     ([path, definition]) => {
         app.component(
