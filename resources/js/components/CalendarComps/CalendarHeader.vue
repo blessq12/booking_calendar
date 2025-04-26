@@ -1,6 +1,7 @@
 <script>
 import { useAppCalendarStore } from "@/stores/appCalendarStore";
 import { useCalendarStore } from "@/stores/calendarStore";
+import gsap from "gsap";
 import { storeToRefs } from "pinia";
 
 export default {
@@ -18,6 +19,26 @@ export default {
             view,
         };
     },
+    mounted() {
+        // Анимация появления основных блоков
+        gsap.from(".calendar-block", {
+            duration: 0.6,
+            y: 20,
+            opacity: 0,
+            stagger: 0.2,
+            ease: "power2.out",
+        });
+
+        // Анимация появления верхнего меню
+        gsap.from(".top-menu-item", {
+            duration: 0.5,
+            y: -20,
+            opacity: 0,
+            stagger: 0.1,
+            ease: "back.out",
+            delay: 0.2,
+        });
+    },
     methods: {
         getLogoutUrl() {
             return window.location.origin + "/auth/logout";
@@ -28,7 +49,31 @@ export default {
         },
 
         handleViewModeChange(mode) {
+            // Анимация при смене режима
+            gsap.to(".view-mode-container", {
+                duration: 0.3,
+                scale: 0.95,
+                yoyo: true,
+                repeat: 1,
+                ease: "power2.inOut",
+            });
             this.appStore.setViewMode(mode);
+        },
+
+        animateHover(target, scale = 1.05) {
+            gsap.to(target, {
+                duration: 0.3,
+                scale: scale,
+                ease: "power2.out",
+            });
+        },
+
+        animateHoverOut(target) {
+            gsap.to(target, {
+                duration: 0.3,
+                scale: 1,
+                ease: "power2.out",
+            });
         },
 
         openCreateBookingModal() {
@@ -37,6 +82,24 @@ export default {
 
         openSearchModal() {
             this.appStore.openModal("search");
+        },
+
+        animateTopMenuHover(target) {
+            gsap.to(target, {
+                duration: 0.3,
+                y: -2,
+                scale: 1.05,
+                ease: "power2.out",
+            });
+        },
+
+        animateTopMenuHoverOut(target) {
+            gsap.to(target, {
+                duration: 0.3,
+                y: 0,
+                scale: 1,
+                ease: "power2.out",
+            });
         },
     },
 };
@@ -47,11 +110,13 @@ export default {
         <div
             class="mx-auto max-w-7xl px-4 md:px-6 flex justify-between gap-4 items-center"
         >
-            <p class="text-xs">Привет, {{ user.name }}</p>
+            <p class="text-xs top-menu-item">Привет, {{ user.name }}</p>
             <div class="flex align-items gap-2">
                 <button
                     @click="openCreateBookingModal"
-                    class="flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer hover:bg-gray-700 transition-all duration-200"
+                    @mouseenter="animateTopMenuHover($event.target)"
+                    @mouseleave="animateTopMenuHoverOut($event.target)"
+                    class="top-menu-item flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer"
                 >
                     <i
                         class="mdi mdi-plus text-md font-bold text-green-500"
@@ -60,7 +125,9 @@ export default {
                 </button>
                 <button
                     @click="openSearchModal"
-                    class="flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer hover:bg-gray-700 transition-all duration-200"
+                    @mouseenter="animateTopMenuHover($event.target)"
+                    @mouseleave="animateTopMenuHoverOut($event.target)"
+                    class="top-menu-item flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer"
                 >
                     <i
                         class="mdi mdi-magnify text-md font-bold text-blue-500"
@@ -70,7 +137,9 @@ export default {
             </div>
             <a
                 :href="getLogoutUrl()"
-                class="text-xs text-white bg-red-800 px-3 py-2 rounded-md cursor-pointer hover:bg-red-700 transition-all duration-200"
+                @mouseenter="animateTopMenuHover($event.target)"
+                @mouseleave="animateTopMenuHoverOut($event.target)"
+                class="top-menu-item text-xs text-white bg-red-800 px-3 py-2 rounded-md cursor-pointer"
                 >Выйти</a
             >
         </div>
@@ -79,7 +148,7 @@ export default {
         <div class="mx-auto max-w-7xl px-4 md:px-6">
             <div class="bg-gray-800 rounded-xl shadow-2xl p-4">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="col-span-1">
+                    <div class="col-span-1 calendar-block">
                         <p class="text-xs text-gray-400 mb-2 py-1">
                             Выберите сауну
                         </p>
@@ -101,60 +170,42 @@ export default {
                             </button>
                         </div>
                     </div>
-                    <div class="col-span-1">
+                    <div class="col-span-1 calendar-block view-mode-container">
                         <p class="text-xs text-gray-400 mb-2 py-1">
                             Отображение:
                         </p>
                         <div class="flex flex-col gap-2">
                             <div class="flex w-full gap-2">
                                 <button
+                                    v-for="(mode, index) in [
+                                        'timeGridDay',
+                                        'timeGridWeek',
+                                        'dayGridMonth',
+                                    ]"
+                                    :key="index"
                                     class="w-full cursor-pointer border rounded-md p-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
                                     :class="{
                                         'bg-blue-900 border-blue-900':
-                                            view.mode === 'timeGridDay',
+                                            view.mode === mode,
                                         'bg-gray-700 border-gray-700':
-                                            view.mode !== 'timeGridDay',
+                                            view.mode !== mode,
                                     }"
-                                    @click="handleViewModeChange('timeGridDay')"
+                                    @click="handleViewModeChange(mode)"
+                                    @mouseenter="animateHover($event.target)"
+                                    @mouseleave="animateHoverOut($event.target)"
                                 >
                                     <i
                                         class="mdi mdi-calendar text-blue-500"
                                     ></i>
-                                    <p class="text-xs text-gray-200">День</p>
-                                </button>
-                                <button
-                                    class="w-full cursor-pointer border rounded-md p-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
-                                    :class="{
-                                        'bg-blue-900 border-blue-900':
-                                            view.mode === 'timeGridWeek',
-                                        'bg-gray-700 border-gray-700':
-                                            view.mode !== 'timeGridWeek',
-                                    }"
-                                    @click="
-                                        handleViewModeChange('timeGridWeek')
-                                    "
-                                >
-                                    <i
-                                        class="mdi mdi-calendar text-blue-500"
-                                    ></i>
-                                    <p class="text-xs text-gray-200">Неделя</p>
-                                </button>
-                                <button
-                                    class="w-full cursor-pointer border rounded-md p-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
-                                    :class="{
-                                        'bg-blue-900 border-blue-900':
-                                            view.mode === 'dayGridMonth',
-                                        'bg-gray-700 border-gray-700':
-                                            view.mode !== 'dayGridMonth',
-                                    }"
-                                    @click="
-                                        handleViewModeChange('dayGridMonth')
-                                    "
-                                >
-                                    <i
-                                        class="mdi mdi-calendar text-blue-500"
-                                    ></i>
-                                    <p class="text-xs text-gray-200">Месяц</p>
+                                    <p class="text-xs text-gray-200">
+                                        {{
+                                            mode === "timeGridDay"
+                                                ? "День"
+                                                : mode === "timeGridWeek"
+                                                ? "Неделя"
+                                                : "Месяц"
+                                        }}
+                                    </p>
                                 </button>
                             </div>
                             <div class="w-full rounded-full">
@@ -165,14 +216,12 @@ export default {
                                     <i
                                         class="mdi mdi-magnify text-blue-500"
                                     ></i>
-                                    <p class="text-xs text-gray-200">
-                                        Поиск по дате
-                                    </p>
+                                    <p class="text-xs text-gray-200">Поиск</p>
                                 </button>
                             </div>
                         </div>
                     </div>
-                    <div class="col-span-1">
+                    <div class="col-span-1 calendar-block">
                         <div class="flex flex-col gap-2">
                             <div class="flex justify-between items-center">
                                 <p class="text-xs text-gray-400">
@@ -199,15 +248,21 @@ export default {
                                     </p>
                                     <p class="text-xs">
                                         {{
-                                            new Date(
-                                                event.start
-                                            ).toLocaleTimeString()
+                                            new Date(event.start)
+                                                .toLocaleTimeString("ru-RU", {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })
+                                                .slice(0, 5)
                                         }}
                                         -
                                         {{
-                                            new Date(
-                                                event.end
-                                            ).toLocaleTimeString()
+                                            new Date(event.end)
+                                                .toLocaleTimeString("ru-RU", {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })
+                                                .slice(0, 5)
                                         }}
                                     </p>
                                 </li>
@@ -220,4 +275,15 @@ export default {
     </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.calendar-block {
+    transform-origin: center;
+    backface-visibility: hidden;
+}
+
+.top-menu-item {
+    transform-origin: center;
+    backface-visibility: hidden;
+    will-change: transform;
+}
+</style>

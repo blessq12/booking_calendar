@@ -6,6 +6,7 @@ export const useCalendarStore = defineStore("calendar", {
         events: [],
         isLoading: false,
         error: null,
+        updateCounter: 0,
     }),
 
     actions: {
@@ -29,6 +30,7 @@ export const useCalendarStore = defineStore("calendar", {
                     title: `Бронь: ${booking.extendedProps.client_name}`,
                     start: booking.start,
                     end: booking.end,
+                    created_at: booking.created_at,
                     extendedProps: {
                         client_name: booking.extendedProps.client_name,
                         client_phone: booking.extendedProps.client_phone,
@@ -37,9 +39,9 @@ export const useCalendarStore = defineStore("calendar", {
                         price: booking.extendedProps.price,
                         prepayment: booking.extendedProps.prepayment,
                         type: booking.extendedProps.type,
+                        created_at: booking.created_at,
                     },
                 }));
-
                 return this.events;
             } catch (error) {
                 this.error =
@@ -60,7 +62,6 @@ export const useCalendarStore = defineStore("calendar", {
             try {
                 const response = await axios.post("/api/bookings", bookingData);
 
-                // Добавляем новое событие в календарь
                 const newEvent = {
                     id: response.data.id,
                     title: `Бронь: ${response.data.client_name}`,
@@ -75,6 +76,7 @@ export const useCalendarStore = defineStore("calendar", {
                 };
 
                 this.events = [...this.events, newEvent];
+                this.updateCounter++;
                 return response.data;
             } catch (error) {
                 this.error =
@@ -86,7 +88,6 @@ export const useCalendarStore = defineStore("calendar", {
             }
         },
 
-        // Удаление брони
         async deleteBooking(bookingId) {
             if (this.isLoading) return;
 
@@ -98,6 +99,7 @@ export const useCalendarStore = defineStore("calendar", {
                 this.events = this.events.filter(
                     (event) => event.id !== bookingId
                 );
+                this.updateCounter++;
                 return true;
             } catch (error) {
                 this.error =
@@ -109,22 +111,15 @@ export const useCalendarStore = defineStore("calendar", {
             }
         },
 
-        // Очистка событий
         clearEvents() {
             this.events = [];
         },
 
-        // Очистка ошибок
         clearError() {
             this.error = null;
         },
 
         async updateBooking(eventData) {
-            const confirmation = confirm(
-                "Вы уверены, что хотите изменить бронирование?"
-            );
-            if (!confirmation) return;
-
             if (this.isLoading) return;
             this.isLoading = true;
             this.error = null;
@@ -133,22 +128,40 @@ export const useCalendarStore = defineStore("calendar", {
                 const response = await axios.put(
                     `/api/bookings/${eventData.id}`,
                     {
-                        start_datetime: eventData.start,
-                        end_datetime: eventData.end,
+                        client_name: eventData.client_name,
+                        client_phone: eventData.client_phone,
+                        comment: eventData.comment,
+                        start_datetime: eventData.start_datetime,
+                        end_datetime: eventData.end_datetime,
+                        sauna_id: eventData.sauna_id,
+                        prepayment: eventData.prepayment,
+                        total_amount: eventData.total_amount,
+                        payment_type: eventData.payment_type,
                     }
                 );
 
-                // Обновляем событие в локальном состоянии
                 this.events = this.events.map((event) =>
                     event.id === eventData.id
                         ? {
                               ...event,
-                              start: eventData.start,
-                              end: eventData.end,
+                              id: eventData.id,
+                              title: `Бронь: ${eventData.client_name}`,
+                              start: eventData.start_datetime,
+                              end: eventData.end_datetime,
+                              extendedProps: {
+                                  client_name: eventData.client_name,
+                                  client_phone: eventData.client_phone,
+                                  comment: eventData.comment,
+                                  sauna_id: eventData.sauna_id,
+                                  prepayment: eventData.prepayment,
+                                  total_amount: eventData.total_amount,
+                                  payment_type: eventData.payment_type,
+                              },
                           }
                         : event
                 );
 
+                this.updateCounter++;
                 return response.data;
             } catch (error) {
                 this.error =
@@ -160,29 +173,24 @@ export const useCalendarStore = defineStore("calendar", {
             }
         },
 
-        // Изменение размера события
         async resizeBooking(eventData) {
             return this.updateBooking(eventData);
         },
 
-        // Перетаскивание события
         async moveBooking(eventData) {
             return this.updateBooking(eventData);
         },
     },
 
     getters: {
-        // Получение всех событий
         getAllEvents: (state) => state.events,
 
-        // Получение событий для конкретной бани
         getEventsBySauna: (state) => (saunaId) => {
             return state.events.filter(
                 (event) => event.extendedProps.sauna_id === saunaId
             );
         },
 
-        // Получение событий за период
         getEventsByDateRange: (state) => (startDate, endDate) => {
             return state.events.filter((event) => {
                 const eventStart = new Date(event.start);
@@ -193,11 +201,39 @@ export const useCalendarStore = defineStore("calendar", {
             });
         },
 
-        // Проверка загрузки
-        getLoadingState: (state) => state.isLoading,
+        getCurrentEvents: (state) => {
+            const now = new Date();
+            const startOfDay = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate()
+            );
+            const endOfDay = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                23,
+                59,
+                59
+            );
 
-        // Получение ошибки
+            return state.events
+                .filter((event) => {
+                    const eventStart = new Date(event.start);
+                    return eventStart >= startOfDay && eventStart <= endOfDay;
+                })
+                .sort((a, b) => {
+                    const aCreated = new Date(a.created_at || 0);
+                    const bCreated = new Date(b.created_at || 0);
+                    return bCreated - aCreated;
+                })
+                .slice(0, 2);
+        },
+
+        getLoadingState: (state) => state.isLoading,
         getError: (state) => state.error,
+
+        getUpdateCounter: (state) => state.updateCounter,
     },
 });
 

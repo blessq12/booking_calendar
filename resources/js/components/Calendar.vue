@@ -80,7 +80,7 @@ export default {
                     await this.fetchEvents();
                 }
             } catch (error) {
-                toast.error(error.message);
+                console.log(error);
             }
         },
 
@@ -98,7 +98,7 @@ export default {
                     end.toISOString()
                 );
             } catch (error) {
-                toast.error(error.message);
+                console.log(error);
             }
         },
 
@@ -145,7 +145,7 @@ export default {
                     this.$refs.fullCalendar.getApi().refetchEvents();
                 }
             } catch (error) {
-                toast.error(error.message);
+                console.log(error);
             }
         },
 
@@ -160,7 +160,7 @@ export default {
                 this.selectedEvent = null;
                 toast.success("Бронирование успешно удалено");
             } catch (error) {
-                toast.error(error.message);
+                console.log(error);
             }
         },
 

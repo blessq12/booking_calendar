@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SaunaController;
 use App\Http\Controllers\Api\BookingController;
-
+use App\Http\Controllers\Api\SearchController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -22,4 +22,5 @@ Route::middleware(['web'])->group(function () {
     });
 
     Route::get('/clients/{client}/bookings', [BookingController::class, 'getClientBookings']);
+    Route::get('/search', [SearchController::class, 'search']);
 });

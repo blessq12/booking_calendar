@@ -31,7 +31,7 @@ export default {
                 initialView: "timeGridWeek",
                 slotMinTime: "00:00:00",
                 slotMaxTime: "24:00:00",
-                allDaySlot: false,
+                allDaySlot: true,
                 selectable: true,
                 selectMirror: true,
                 editable: true,
@@ -45,16 +45,23 @@ export default {
                 eventOverlap: false,
                 headerToolbar: false,
                 slotDuration: "01:00:00",
-                selectMinDistance: 1000,
+                selectMinDistance: 10,
+                firstDay: 1,
                 locale: "ru",
+                longPressDelay: 100,
+                eventLongPressDelay: 100,
+                selectLongPressDelay: 100,
                 events: (fetchInfo, successCallback, failureCallback) => {
                     this.fetchEvents(fetchInfo)
                         .then(successCallback)
                         .catch(failureCallback);
                 },
-                select: this.handleDateSelect,
-                eventClick: this.handleEventClick,
-                eventsSet: this.handleEvents,
+                select: (selectInfo) => {
+                    this.handleDateSelect(selectInfo);
+                },
+                eventClick: (clickInfo) => {
+                    this.handleEventClick(clickInfo);
+                },
                 datesSet: this.handleDatesSet,
                 eventDrop: this.handleEventDrop,
                 eventResize: this.handleEventResize,
@@ -68,12 +75,20 @@ export default {
                             month: "long",
                             day: "2-digit",
                         },
+                        selectConstraint: {
+                            startTime: "00:00",
+                            endTime: "24:00",
+                        },
                     },
                     timeGridDay: {
                         titleFormat: {
                             year: "numeric",
                             month: "long",
                             day: "2-digit",
+                        },
+                        selectConstraint: {
+                            startTime: "00:00",
+                            endTime: "24:00",
                         },
                     },
                     dayGridMonth: {
@@ -95,6 +110,7 @@ export default {
                     startDate: fetchInfo.startStr,
                     endDate: fetchInfo.endStr,
                 });
+
                 return this.calendarStore.getAllEvents;
             } catch (error) {
                 console.error("Error fetching events:", error);
@@ -108,16 +124,14 @@ export default {
 
             // Проверяем, что выбранная дата не в прошлом
             if (selectedStart < now) {
-                this.$toast.error(
-                    "Нельзя создать бронирование на прошедшее время"
-                );
+                alert("Нельзя создать бронирование на прошедшее время");
                 return;
             }
 
             const duration =
                 (selectInfo.end - selectInfo.start) / (1000 * 60 * 60);
             if (duration < 1) {
-                this.$toast.error("Минимальное время бронирования - 1 час");
+                alert("Минимальное время бронирования - 1 час");
                 return;
             }
 
@@ -141,13 +155,25 @@ export default {
             this.appStore.setSelectedDate(dateInfo.start);
         },
 
-        handleEventDrop(dropInfo) {
+        async handleEventDrop(dropInfo) {
             try {
-                this.calendarStore.moveBooking({
+                await this.calendarStore.moveBooking({
                     id: dropInfo.event.id,
-                    start: dropInfo.event.start,
-                    end: dropInfo.event.end,
+                    client_name: dropInfo.event.extendedProps.client_name,
+                    client_phone: dropInfo.event.extendedProps.client_phone,
+                    comment: dropInfo.event.extendedProps.comment,
+                    start_datetime: dropInfo.event.start,
+                    end_datetime: dropInfo.event.end,
+                    sauna_id: dropInfo.event.extendedProps.sauna_id,
+                    prepayment: dropInfo.event.extendedProps.prepayment,
+                    total_amount: dropInfo.event.extendedProps.price,
+                    payment_type: dropInfo.event.extendedProps.type,
                 });
+
+                // Обновляем события календаря после успешного перемещения
+                if (this.calendarApi) {
+                    this.calendarApi.refetchEvents();
+                }
             } catch (error) {
                 console.error("Error moving event:", error);
                 dropInfo.revert();
@@ -158,8 +184,15 @@ export default {
             try {
                 this.calendarStore.resizeBooking({
                     id: resizeInfo.event.id,
-                    start: resizeInfo.event.start,
-                    end: resizeInfo.event.end,
+                    client_name: resizeInfo.event.extendedProps.client_name,
+                    client_phone: resizeInfo.event.extendedProps.client_phone,
+                    comment: resizeInfo.event.extendedProps.comment,
+                    start_datetime: resizeInfo.event.start,
+                    end_datetime: resizeInfo.event.end,
+                    sauna_id: resizeInfo.event.extendedProps.sauna_id,
+                    prepayment: resizeInfo.event.extendedProps.prepayment,
+                    total_amount: resizeInfo.event.extendedProps.price,
+                    payment_type: resizeInfo.event.extendedProps.type,
                 });
             } catch (error) {
                 console.error("Error resizing event:", error);
@@ -191,7 +224,11 @@ export default {
         },
     },
     mounted() {
-        this.$nextTick(this.initializeCalendar);
+        this.$nextTick(() => {
+            if (this.$refs.fullCalendar) {
+                this.initializeCalendar();
+            }
+        });
     },
     watch: {
         "view.mode"(newMode) {
@@ -200,6 +237,11 @@ export default {
             }
         },
         "appStore.selectedSauna"() {
+            if (this.calendarApi) {
+                this.calendarApi.refetchEvents();
+            }
+        },
+        "calendarStore.getUpdateCounter"() {
             if (this.calendarApi) {
                 this.calendarApi.refetchEvents();
             }
@@ -216,6 +258,12 @@ export default {
                     ref="fullCalendar"
                     :options="calendarOptions"
                     class="calendar-height"
+                    @select="handleDateSelect"
+                    @eventClick="handleEventClick"
+                    @datesSet="handleDatesSet"
+                    @eventDrop="handleEventDrop"
+                    @eventResize="handleEventResize"
+                    @eventChange="handleEventChange"
                 />
             </div>
         </div>

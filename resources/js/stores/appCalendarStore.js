@@ -9,6 +9,7 @@ export const useAppCalendarStore = defineStore("appCalendar", {
         modal: {
             isOpen: false,
             type: null,
+            title: null,
             data: null,
         },
         view: {
@@ -128,9 +129,17 @@ export const useAppCalendarStore = defineStore("appCalendar", {
         },
 
         openModal(type, data = null) {
+            const titles = {
+                create: "Создание брони",
+                view: "Просмотр брони",
+                update: "Редактирование брони",
+                search: "Поиск бронирований",
+            };
+
             this.modal = {
                 isOpen: true,
                 type,
+                title: titles[type] || "Модальное окно",
                 data,
             };
         },
@@ -139,6 +148,7 @@ export const useAppCalendarStore = defineStore("appCalendar", {
             this.modal = {
                 isOpen: false,
                 type: null,
+                title: null,
                 data: null,
             };
         },
