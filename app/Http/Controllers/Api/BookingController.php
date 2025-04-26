@@ -159,4 +159,102 @@ class BookingController extends Controller
             ], 422);
         }
     }
+
+    public function index(Request $request)
+    {
+        $sauna_id = $request->query('sauna_id');
+        if (!$sauna_id) {
+            return response()->json(['message' => 'Сауна не указана'], 422);
+        }
+        $startDate = $request->query('start_date', now()->startOfDay());
+        $endDate = $request->query('end_date', now()->addDays(30));
+
+        $sauna = \App\Models\Sauna::find($sauna_id);
+
+
+        $bookings = [];
+        foreach ($sauna->bookings as $booking) {
+            $bookings[] = [
+                'id' => $booking->id,
+                'title' => 'Забронировано',
+                'start' => $booking->start_datetime,
+                'end' => $booking->end_datetime,
+                'extendedProps' => [
+                    'client_name' => $booking->client->name,
+                    'client_phone' => $booking->client->phone,
+                    'price' => $booking->price,
+                    'prepayment' => $booking->prepayment,
+                    'comment' => $booking->comment ?? null,
+                    'type' => $booking->type == 'cash' ? 'Наличные' : ($booking->type == 'card' ? 'Карта' : 'Перевод')
+                ]
+            ];
+        }
+
+        return response()->json($bookings);
+    }
+
+    public function getClientBookings(Client $client)
+    {
+        $schedules = Schedule::whereJsonContains('slots', ['client_id' => $client->id])
+            ->where('date', '>=', now()->startOfDay())
+            ->get();
+
+        $bookings = [];
+        foreach ($schedules as $schedule) {
+            foreach ($schedule->slots as $slot) {
+                if ($slot['client_id'] === $client->id) {
+                    $bookings[] = [
+                        'id' => $schedule->id . '_' . $slot['time'],
+                        'sauna' => $schedule->sauna->name,
+                        'date' => $schedule->date,
+                        'start_time' => $slot['booking_start'],
+                        'end_time' => $slot['booking_end']
+                    ];
+                }
+            }
+        }
+
+        return response()->json($bookings);
+    }
+
+    public function destroy($bookingId)
+    {
+        try {
+            DB::beginTransaction();
+
+            // Разбираем составной ID на ID расписания и время
+            [$scheduleId, $time] = explode('_', $bookingId);
+
+            $schedule = Schedule::findOrFail($scheduleId);
+            $slots = $schedule->slots;
+
+            // Находим и удаляем все слоты, относящиеся к этому бронированию
+            foreach ($slots as $key => $slot) {
+                if ($slot['time'] === $time) {
+                    $bookingStart = $slot['booking_start'];
+                    $bookingEnd = $slot['booking_end'];
+                    break;
+                }
+            }
+
+            if (!isset($bookingStart) || !isset($bookingEnd)) {
+                throw new \Exception('Бронирование не найдено');
+            }
+
+            // Удаляем все слоты этого бронирования
+            $slots = array_filter($slots, function ($slot) use ($bookingStart, $bookingEnd) {
+                return !($slot['booking_start'] === $bookingStart && $slot['booking_end'] === $bookingEnd);
+            });
+
+            $schedule->slots = array_values($slots);
+            $schedule->save();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Бронирование успешно удалено']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
 }
