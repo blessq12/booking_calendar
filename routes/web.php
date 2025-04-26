@@ -17,7 +17,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/booking', [ScheduleController::class, 'index'])->name('booking');
 });
 
-Route::controller(AuthController::class)->group(function () {
+Route::controller(AuthController::class)->prefix('auth')->group(function () {
     Route::get('/login', 'login')->name('login');
     Route::post('/authorize', 'authorize')->name('authorize');
     Route::get('/logout', 'logout')->name('logout');

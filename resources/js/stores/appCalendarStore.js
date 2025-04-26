@@ -1,11 +1,24 @@
 import axios from "axios";
 import { acceptHMRUpdate, defineStore } from "pinia";
 
-export const useBookingStore = defineStore("booking", {
+export const useAppCalendarStore = defineStore("appCalendar", {
     state: () => ({
         bookings: [],
         saunas: [],
         selectedSauna: null,
+        modal: {
+            isOpen: false,
+            type: null,
+            data: null,
+        },
+        view: {
+            mode: "timeGridDay",
+            selectedDate: null,
+            selectedDateRange: {
+                start: null,
+                end: null,
+            },
+        },
         bookingForm: {
             sauna_id: null,
             client_name: "",
@@ -16,18 +29,26 @@ export const useBookingStore = defineStore("booking", {
         },
         validationErrors: {},
         isLoading: false,
+        error: null,
     }),
 
     actions: {
         async fetchSaunas() {
+            this.isLoading = true;
             try {
                 const response = await axios.get("/api/saunas");
                 this.saunas = response.data;
                 if (this.saunas.length > 0 && !this.selectedSauna) {
                     this.selectedSauna = this.saunas[0].id;
                 }
+                return this.saunas;
             } catch (error) {
-                throw new Error("Ошибка загрузки саун: " + error.message);
+                this.error =
+                    error.response?.data?.message ||
+                    "Ошибка при получении списка бань";
+                throw this.error;
+            } finally {
+                this.isLoading = false;
             }
         },
 
@@ -105,9 +126,69 @@ export const useBookingStore = defineStore("booking", {
         setValidationErrors(errors) {
             this.validationErrors = errors;
         },
+
+        openModal(type, data = null) {
+            this.modal = {
+                isOpen: true,
+                type,
+                data,
+            };
+        },
+
+        closeModal() {
+            this.modal = {
+                isOpen: false,
+                type: null,
+                data: null,
+            };
+        },
+
+        setViewMode(mode) {
+            const allowedModes = [
+                "timeGridDay",
+                "timeGridWeek",
+                "dayGridMonth",
+            ];
+            if (allowedModes.includes(mode)) {
+                this.view.mode = mode;
+            }
+        },
+
+        setSelectedDate(date) {
+            this.view.selectedDate = date;
+        },
+
+        setSelectedDateRange(start, end) {
+            this.view.selectedDateRange = { start, end };
+        },
+
+        clearError() {
+            this.error = null;
+        },
+    },
+
+    getters: {
+        getSaunas: (state) => state.saunas,
+
+        getCurrentSauna: (state) =>
+            state.saunas.find((sauna) => sauna.id === state.selectedSauna),
+
+        getModalState: (state) => state.modal,
+
+        getViewMode: (state) => state.view.mode,
+
+        getSelectedDate: (state) => state.view.selectedDate,
+
+        getSelectedDateRange: (state) => state.view.selectedDateRange,
+
+        isAppLoading: (state) => state.isLoading,
+
+        getError: (state) => state.error,
     },
 });
 
 if (import.meta.hot) {
-    import.meta.hot.accept(acceptHMRUpdate(useBookingStore, import.meta.hot));
+    import.meta.hot.accept(
+        acceptHMRUpdate(useAppCalendarStore, import.meta.hot)
+    );
 }

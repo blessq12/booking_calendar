@@ -21,16 +21,8 @@
 </head>
 
 <body>
-    @if (Auth::check())
-        <div class="bg-gradient-to-b from-blue-500 to-blue-600 py-2 mx-auto max-w-7xl">
-            <div class="mx-auto max-w-7xl px-4 md:px-6 flex justify-between items-center">
-                <p class="text-white text-sm">Привет, {{ Auth::user()->name }}</p>
-                <a href="{{ route('logout') }}" class=" text-sm text-white">Выйти</a>
-            </div>
-        </div>
-    @endif
     <div id="app">
-        <calendar />
+        <calendar :user='@json(Auth::user())' />
     </div>
 </body>
 

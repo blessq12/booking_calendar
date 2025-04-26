@@ -8,28 +8,31 @@ import { useToast } from "vue-toast-notification";
 import "vue-toast-notification/dist/theme-sugar.css";
 const toast = useToast({ timeout: 3000, position: "top-right" });
 
-import { useBookingStore } from "@/stores/bookingStore";
+import { useAppCalendarStore } from "@/stores/appCalendarStore";
+import { useCalendarStore } from "@/stores/calendarStore";
+
 import axios from "axios";
-import { storeToRefs } from "pinia";
 
 export default {
     name: "Calendar",
-    setup() {
-        const bookingStore = useBookingStore();
-        const {
-            saunas,
-            selectedSauna,
-            bookingForm,
-            validationErrors,
-            isLoading,
-        } = storeToRefs(bookingStore);
+    props: {
+        user: {
+            type: Object,
+            required: true,
+        },
+    },
+    provide() {
         return {
-            bookingStore,
-            saunas,
-            selectedSauna,
-            bookingForm,
-            validationErrors,
-            isLoading,
+            user: this.user,
+        };
+    },
+    setup() {
+        const calendarStore = useCalendarStore();
+        const appCalendarStore = useAppCalendarStore();
+
+        return {
+            calendarStore,
+            appCalendarStore,
         };
     },
     data() {
@@ -37,13 +40,20 @@ export default {
             showModal: false,
             showViewModal: false,
             selectedEvent: null,
-
             currentEvents: [],
         };
     },
     watch: {
-        selectedSauna() {
-            this.onSaunaChange();
+        "appCalendarStore.selectedSauna"(newValue) {
+            if (newValue) {
+                this.$refs.calendarContent?.fetchEvents();
+            }
+        },
+        "appCalendarStore.viewMode"(newValue) {
+            if (this.$refs.fullCalendar) {
+                const calendarApi = this.$refs.fullCalendar.getApi();
+                calendarApi.changeView(newValue);
+            }
         },
         showModal(isOpen) {
             if (isOpen) {
@@ -56,16 +66,39 @@ export default {
         },
     },
     methods: {
-        getInitialView() {
-            return window.innerWidth < 768 ? "timeGridDay" : "timeGridWeek";
+        async initialize() {
+            try {
+                await this.appCalendarStore.fetchSaunas();
+                if (this.$refs.fullCalendar) {
+                    const calendarApi = this.$refs.fullCalendar.getApi();
+                    calendarApi.setOption(
+                        "initialView",
+                        this.appCalendarStore.viewMode
+                    );
+                }
+                if (this.appCalendarStore.selectedSauna) {
+                    await this.fetchEvents();
+                }
+            } catch (error) {
+                toast.error(error.message);
+            }
         },
 
         async fetchEvents() {
+            if (!this.appCalendarStore.selectedSauna) return;
+
             try {
-                return await this.bookingStore.fetchBookings();
+                const calendarApi = this.$refs.fullCalendar.getApi();
+                const start = calendarApi.view.activeStart;
+                const end = calendarApi.view.activeEnd;
+
+                await this.calendarStore.fetchBookings(
+                    this.appCalendarStore.selectedSauna,
+                    start.toISOString(),
+                    end.toISOString()
+                );
             } catch (error) {
                 toast.error(error.message);
-                return [];
             }
         },
 
@@ -78,15 +111,28 @@ export default {
                 return;
             }
 
-            this.bookingStore.setBookingForm({
-                start_datetime: selectInfo.start,
-                end_datetime: selectInfo.end,
-                comment: "",
-                client_name: "",
-                client_phone: "",
-            });
+            this.calendarStore.setSelectedDates(
+                selectInfo.start,
+                selectInfo.end
+            );
+            this.appCalendarStore.openModal("create");
+        },
 
-            this.showModal = true;
+        handleEventClick(clickInfo) {
+            this.selectedEvent = clickInfo.event;
+            this.appCalendarStore.openModal("view", this.selectedEvent);
+        },
+
+        handleEvents(events) {
+            this.currentEvents = events;
+        },
+
+        handleDatesSet(dateInfo) {
+            console.log("Dates changed:", dateInfo);
+        },
+
+        getInitialView() {
+            return window.innerWidth < 768 ? "timeGridDay" : "timeGridWeek";
         },
 
         async createBooking() {
@@ -116,15 +162,6 @@ export default {
             } catch (error) {
                 toast.error(error.message);
             }
-        },
-
-        handleEventClick(clickInfo) {
-            this.selectedEvent = clickInfo.event;
-            this.showViewModal = true;
-        },
-
-        handleEvents(events) {
-            this.currentEvents = events;
         },
 
         async onSaunaChange() {
@@ -236,12 +273,7 @@ export default {
             Accept: "application/json",
         };
 
-        try {
-            await this.bookingStore.fetchSaunas();
-            this.initializeCalendar();
-        } catch (error) {
-            toast.error(error.message);
-        }
+        await this.initialize();
     },
     updated() {
         if (this.selectedSauna) {
@@ -253,7 +285,13 @@ export default {
 
 <template>
     <calendar-header />
-    <calendar-content />
+    <calendar-content
+        ref="calendarContent"
+        @date-select="handleDateSelect"
+        @event-click="handleEventClick"
+        @events-set="handleEvents"
+        @dates-set="handleDatesSet"
+    />
     <calendar-modal />
     <calendar-footer />
 </template>

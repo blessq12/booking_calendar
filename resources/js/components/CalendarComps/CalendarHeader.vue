@@ -1,160 +1,219 @@
 <script>
+import { useAppCalendarStore } from "@/stores/appCalendarStore";
+import { useCalendarStore } from "@/stores/calendarStore";
+import { storeToRefs } from "pinia";
+
 export default {
     name: "Header",
-    data() {
+    inject: ["user"],
+    setup() {
+        const appStore = useAppCalendarStore();
+        const calendarStore = useCalendarStore();
+        const { saunas, selectedSauna, view } = storeToRefs(appStore);
         return {
-            selectedSauna: null, // Переменная для выбранной сауны
-            saunas: [], // Массив сауны
-            calendarOptions: {
-                initialView: "dayGridMonth", // Начальный вид календаря
-            },
+            appStore,
+            calendarStore,
+            saunas,
+            selectedSauna,
+            view,
         };
     },
     methods: {
-        handleSaunaChange() {
-            // Логика обработки изменения сауны
+        getLogoutUrl() {
+            return window.location.origin + "/auth/logout";
         },
-        prevPeriod() {
-            // Логика для перехода к предыдущему периоду
+
+        handleSaunaSelect(saunaId) {
+            this.appStore.setSelectedSauna(saunaId);
         },
-        nextPeriod() {
-            // Логика для перехода к следующему периоду
+
+        handleViewModeChange(mode) {
+            this.appStore.setViewMode(mode);
         },
-        goToToday() {
-            // Логика для перехода к сегодняшнему дню
+
+        openCreateBookingModal() {
+            this.appStore.openModal("create");
         },
-        switchView(view) {
-            // Логика для переключения вида календаря
+
+        openSearchModal() {
+            this.appStore.openModal("search");
         },
     },
 };
 </script>
 
 <template>
+    <div class="bg-gradient-to-t from-gray-900 to-black py-4 text-gray-100">
+        <div
+            class="mx-auto max-w-7xl px-4 md:px-6 flex justify-between gap-4 items-center"
+        >
+            <p class="text-xs">Привет, {{ user.name }}</p>
+            <div class="flex align-items gap-2">
+                <button
+                    @click="openCreateBookingModal"
+                    class="flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer hover:bg-gray-700 transition-all duration-200"
+                >
+                    <i
+                        class="mdi mdi-plus text-md font-bold text-green-500"
+                    ></i>
+                    <span class="hidden sm:inline">Новая запись</span>
+                </button>
+                <button
+                    @click="openSearchModal"
+                    class="flex justify-center items-center gap-2 text-xs text-white bg-gray-800 px-5 py-2 sm:px-3 sm:py-2 rounded-md cursor-pointer hover:bg-gray-700 transition-all duration-200"
+                >
+                    <i
+                        class="mdi mdi-magnify text-md font-bold text-blue-500"
+                    ></i>
+                    <span class="hidden sm:inline">Поиск</span>
+                </button>
+            </div>
+            <a
+                :href="getLogoutUrl()"
+                class="text-xs text-white bg-red-800 px-3 py-2 rounded-md cursor-pointer hover:bg-red-700 transition-all duration-200"
+                >Выйти</a
+            >
+        </div>
+    </div>
     <div class="bg-gray-900 text-gray-100 py-4">
         <div class="mx-auto max-w-7xl px-4 md:px-6">
             <div class="bg-gray-800 rounded-xl shadow-2xl p-4">
-                <div class="flex flex-col space-y-4">
-                    <div class="sm:w-full md:hidden relative">
-                        <select
-                            v-model="selectedSauna"
-                            @change="handleSaunaChange"
-                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border-0 bg-blue-600 text-white focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 hover:bg-blue-700 cursor-pointer appearance-none"
-                        >
-                            <option value="" disabled>Выберите сауну</option>
-                            <option
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="col-span-1">
+                        <p class="text-xs text-gray-400 mb-2 py-1">
+                            Выберите сауну
+                        </p>
+                        <div class="grid grid-cols-4 md:grid-cols-2 gap-2">
+                            <button
                                 v-for="sauna in saunas"
                                 :key="sauna.id"
-                                :value="sauna.id"
-                                class="bg-gray-800 text-gray-100 py-2"
-                            >
-                                {{ sauna.name }}
-                            </option>
-                        </select>
-                        <i
-                            class="fa fa-home absolute left-3 top-1/2 -translate-y-1/2 text-white/80"
-                        ></i>
-                        <i
-                            class="fa fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-white/80"
-                        ></i>
-                    </div>
-                    <div class="hidden md:block relative">
-                        <select
-                            v-model="selectedSauna"
-                            @change="handleSaunaChange"
-                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border-0 bg-blue-600 text-white focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 hover:bg-blue-700 cursor-pointer appearance-none"
-                        >
-                            <option value="" disabled>Выберите сауну</option>
-                            <option
-                                v-for="sauna in saunas"
-                                :key="sauna.id"
-                                :value="sauna.id"
-                                class="bg-gray-800 text-gray-100 py-2"
-                            >
-                                {{ sauna.name }}
-                            </option>
-                        </select>
-                        <i
-                            class="fa fa-home absolute left-3 top-1/2 -translate-y-1/2 text-white/80"
-                        ></i>
-                        <i
-                            class="fa fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-white/80"
-                        ></i>
-                    </div>
-                    <div class="flex items-center justify-between w-full">
-                        <div class="flex items-center gap-2">
-                            <button
-                                @click="prevPeriod"
-                                class="p-2 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors"
-                            >
-                                <i class="mdi mdi-chevron-left"></i>
-                            </button>
-                            <button
-                                @click="nextPeriod"
-                                class="p-2 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors"
-                            >
-                                <i class="mdi mdi-chevron-right"></i>
-                            </button>
-                            <button
-                                @click="goToToday"
-                                class="px-2 py-1.5 rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-600 transition-colors flex gap-2"
-                            >
-                                <i class="mdi mdi-calendar-today text-lg"></i>
-                                <span class="hidden sm:inline">Сегодня</span>
-                            </button>
-                        </div>
-                        <div class="hidden sm:block md:w-1/2"></div>
-                        <div
-                            class="flex items-center bg-gray-700/50 rounded-lg p-1"
-                        >
-                            <button
-                                @click="switchView('dayGridMonth')"
-                                class="px-3 py-1 rounded-md transition-all duration-200 flex items-center gap-2"
+                                class="w-full justify-center cursor-pointer border rounded-md p-2 flex items-center gap-2 hover:bg-white/20 transition-all duration-200"
                                 :class="{
-                                    'bg-blue-600 text-white':
-                                        calendarOptions.initialView ===
-                                        'dayGridMonth',
-                                    'text-gray-400 hover:text-gray-200':
-                                        calendarOptions.initialView !==
-                                        'dayGridMonth',
+                                    'bg-blue-900 border-blue-900':
+                                        selectedSauna === sauna.id,
+                                    'bg-gray-700 border-gray-700':
+                                        selectedSauna !== sauna.id,
                                 }"
+                                @click="handleSaunaSelect(sauna.id)"
                             >
-                                <i class="mdi mdi-calendar-month text-lg"></i>
-                                <span class="hidden sm:inline">Месяц</span>
-                            </button>
-                            <button
-                                @click="switchView('timeGridWeek')"
-                                class="px-3 py-1 rounded-md transition-all duration-200 flex items-center gap-2"
-                                :class="{
-                                    'bg-blue-600 text-white':
-                                        calendarOptions.initialView ===
-                                        'timeGridWeek',
-                                    'text-gray-400 hover:text-gray-200':
-                                        calendarOptions.initialView !==
-                                        'timeGridWeek',
-                                }"
-                            >
-                                <i class="mdi mdi-calendar-week text-lg"></i>
-                                <span class="hidden sm:inline">Неделя</span>
-                            </button>
-                            <button
-                                @click="switchView('timeGridDay')"
-                                class="px-3 py-1 rounded-md transition-all duration-200 flex items-center gap-2"
-                                :class="'bg-blue-600 text-white'"
-                            >
-                                <i class="mdi mdi-calendar-today text-lg"></i>
-                                <span class="hidden sm:inline">День</span>
+                                <i>🔥</i>
+                                <p class="text-xs">{{ sauna.name }}</p>
                             </button>
                         </div>
                     </div>
-                    <button
-                        class="w-full group px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                    >
-                        <i
-                            class="mdi mdi-plus text-xl group-hover:rotate-90 transition-transform duration-300"
-                        ></i>
-                        <span>Создать запись</span>
-                    </button>
+                    <div class="col-span-1">
+                        <p class="text-xs text-gray-400 mb-2 py-1">
+                            Отображение:
+                        </p>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex w-full gap-2">
+                                <button
+                                    class="w-full cursor-pointer border rounded-md p-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
+                                    :class="{
+                                        'bg-blue-900 border-blue-900':
+                                            view.mode === 'timeGridDay',
+                                        'bg-gray-700 border-gray-700':
+                                            view.mode !== 'timeGridDay',
+                                    }"
+                                    @click="handleViewModeChange('timeGridDay')"
+                                >
+                                    <i
+                                        class="mdi mdi-calendar text-blue-500"
+                                    ></i>
+                                    <p class="text-xs text-gray-200">День</p>
+                                </button>
+                                <button
+                                    class="w-full cursor-pointer border rounded-md p-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
+                                    :class="{
+                                        'bg-blue-900 border-blue-900':
+                                            view.mode === 'timeGridWeek',
+                                        'bg-gray-700 border-gray-700':
+                                            view.mode !== 'timeGridWeek',
+                                    }"
+                                    @click="
+                                        handleViewModeChange('timeGridWeek')
+                                    "
+                                >
+                                    <i
+                                        class="mdi mdi-calendar text-blue-500"
+                                    ></i>
+                                    <p class="text-xs text-gray-200">Неделя</p>
+                                </button>
+                                <button
+                                    class="w-full cursor-pointer border rounded-md p-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
+                                    :class="{
+                                        'bg-blue-900 border-blue-900':
+                                            view.mode === 'dayGridMonth',
+                                        'bg-gray-700 border-gray-700':
+                                            view.mode !== 'dayGridMonth',
+                                    }"
+                                    @click="
+                                        handleViewModeChange('dayGridMonth')
+                                    "
+                                >
+                                    <i
+                                        class="mdi mdi-calendar text-blue-500"
+                                    ></i>
+                                    <p class="text-xs text-gray-200">Месяц</p>
+                                </button>
+                            </div>
+                            <div class="w-full rounded-full">
+                                <button
+                                    @click="openSearchModal"
+                                    class="w-full rounded-md border border-gray-700 py-2 flex items-center justify-center gap-2 hover:bg-white/20 transition-all duration-200"
+                                >
+                                    <i
+                                        class="mdi mdi-magnify text-blue-500"
+                                    ></i>
+                                    <p class="text-xs text-gray-200">
+                                        Поиск по дате
+                                    </p>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-1">
+                        <div class="flex flex-col gap-2">
+                            <div class="flex justify-between items-center">
+                                <p class="text-xs text-gray-400">
+                                    Ближайшие записи
+                                </p>
+                                <button
+                                    class="text-xs text-white bg-blue-500 rounded-md px-2 py-1 cursor-pointer hover:bg-blue-600 transition-all duration-200"
+                                >
+                                    <i class="mdi mdi-refresh"></i>
+                                </button>
+                            </div>
+
+                            <ul class="flex flex-col gap-2">
+                                <li
+                                    v-for="event in calendarStore?.getCurrentEvents?.slice(
+                                        0,
+                                        2
+                                    )"
+                                    :key="event.id"
+                                    class="flex justify-between border border-gray-700 bg-white/10 rounded-md p-3"
+                                >
+                                    <p class="text-xs font-bold">
+                                        {{ event.extendedProps.client_name }}
+                                    </p>
+                                    <p class="text-xs">
+                                        {{
+                                            new Date(
+                                                event.start
+                                            ).toLocaleTimeString()
+                                        }}
+                                        -
+                                        {{
+                                            new Date(
+                                                event.end
+                                            ).toLocaleTimeString()
+                                        }}
+                                    </p>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
