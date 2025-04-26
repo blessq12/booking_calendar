@@ -51,6 +51,12 @@ export default {
                 longPressDelay: 100,
                 eventLongPressDelay: 100,
                 selectLongPressDelay: 100,
+                dateClick: (arg) => {
+                    if (this.calendarApi.view.type === "dayGridMonth") {
+                        this.calendarApi.changeView("timeGridDay", arg.date);
+                        this.appStore.setViewMode("timeGridDay");
+                    }
+                },
                 events: (fetchInfo, successCallback, failureCallback) => {
                     this.fetchEvents(fetchInfo)
                         .then(successCallback)

@@ -16,18 +16,18 @@
     "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-BnKYbeD6.css",
+    "file": "assets/app-paScBMWd.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-BEa3SJJA.js",
+    "file": "assets/app-EKgdZ1bs.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "css": [
-      "assets/app-PKfPcu5s.css",
-      "assets/app-BnKYbeD6.css"
+      "assets/app-Ca4wo5z-.css",
+      "assets/app-paScBMWd.css"
     ],
     "assets": [
       "assets/materialdesignicons-webfont-CSr8KVlo.eot",
